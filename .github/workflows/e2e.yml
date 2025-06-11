@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Release
-        uses: softprops/action-gh-release@68ad78f999032aa0250c8c6de2802e0ddb994d92
+        uses: softprops/action-gh-release@d674ce0a7d849821391ec4843ee2bbb94aeed9dd # softprops/action-gh-release#372
         if: github.ref_type == 'tag'
         with:
           files: |
