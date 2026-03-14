@@ -38,7 +38,6 @@ jobs:
           echo "barrier_epoch=$(( $(date +%s) + 45 ))" >> "$GITHUB_OUTPUT"
 
   worker:
-    if: ${{ matrix.slot <= fromJSON(inputs.worker_count) }}
     needs: prepare
     runs-on: ubuntu-latest
     strategy:
@@ -49,17 +48,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/checkout@v4
+      - id: guard
+        run: |
+          if [ "${{ matrix.slot }}" -le "${{ inputs.worker_count }}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.guard.outputs.enabled == 'true'
+        uses: actions/checkout@v4
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}
           path: action-under-test
 
-      - name: Prepare worker asset
+      - if: steps.guard.outputs.enabled == 'true'
+        name: Prepare worker asset
         run: |
           printf 'worker %s for %s\n' "${{ matrix.slot }}" "${{ needs.prepare.outputs.tag_name }}" > "asset-${{ matrix.slot }}.txt"
 
-      - name: Wait for barrier
+      - if: steps.guard.outputs.enabled == 'true'
+        name: Wait for barrier
         env:
           BARRIER_EPOCH: ${{ needs.prepare.outputs.barrier_epoch }}
         run: |
@@ -67,7 +77,8 @@ jobs:
             sleep 1
           done
 
-      - name: Attempt release update
+      - if: steps.guard.outputs.enabled == 'true'
+        name: Attempt release update
         id: release
         continue-on-error: true
         uses: ./action-under-test
@@ -83,6 +94,7 @@ jobs:
           {
             "slot": ${{ matrix.slot }},
             "tag_name": "${{ needs.prepare.outputs.tag_name }}",
+            "enabled": "${{ steps.guard.outputs.enabled }}",
             "outcome": "${{ steps.release.outcome }}"
           }
           EOF
