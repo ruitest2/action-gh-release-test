@@ -39,6 +39,7 @@ jobs:
   trigger:
     runs-on: ubuntu-latest
     env:
+      HAS_TRIGGER_TOKEN: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN != '' }}
       TAG_NAME: v708.${{ github.run_id }}.${{ github.run_attempt }}-rc.1
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +60,7 @@ jobs:
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           name: Prerelease repro ${{ env.TAG_NAME }}
+          token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN || github.token }}
           files: prerelease.txt
 
       - name: Assert observer workflows
@@ -66,6 +68,7 @@ jobs:
         env:
           EXPECTED_PRERELEASED: ${{ inputs.expected_prereleased }}
           EXPECTED_PUBLISHED: ${{ inputs.expected_published }}
+          HAS_TRIGGER_TOKEN: ${{ env.HAS_TRIGGER_TOKEN }}
           TAG_NAME: ${{ env.TAG_NAME }}
         with:
           github-token: ${{ github.token }}
@@ -73,6 +76,7 @@ jobs:
             const tagName = process.env.TAG_NAME;
             const expectedPrereleased = process.env.EXPECTED_PRERELEASED;
             const expectedPublished = process.env.EXPECTED_PUBLISHED;
+            const hasTriggerToken = process.env.HAS_TRIGGER_TOKEN === "true";
             const { owner, repo } = context.repo;
 
             const findRuns = async (workflowId) => {
@@ -114,6 +118,7 @@ jobs:
             core.summary
               .addHeading("Prerelease observer check")
               .addRaw(`Tag: ${tagName}\n`)
+              .addRaw(`Custom trigger token configured: ${hasTriggerToken}\n`)
               .addRaw(`Prereleased observer runs: ${prereleasedRuns.length}\n`)
               .addRaw(`Published observer runs: ${publishedRuns.length}\n`)
               .addCodeBlock(
@@ -138,6 +143,13 @@ jobs:
                 "json",
               )
               .write();
+
+            if (!hasTriggerToken && prereleasedRuns.length === 0 && publishedRuns.length === 0) {
+              core.setFailed(
+                "no ACTION_GH_RELEASE_TRIGGER_TOKEN secret is configured; releases created with GITHUB_TOKEN do not trigger downstream release workflows",
+              );
+              return;
+            }
 
             assertRuns(expectedPrereleased, prereleasedRuns, "prereleased");
             assertRuns(expectedPublished, publishedRuns, "published");

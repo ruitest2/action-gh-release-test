@@ -20,6 +20,7 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Use `.github/workflows/repro-assets-output.yml` for invalid `assets` output URLs and fix verification (`#713`, PR `#738`).
 - Use `.github/workflows/repro-race.yml` for parallel upload/finalization races (`#704`, `#705`, `#709`).
 - Use `.github/workflows/trigger-prerelease.yml` together with `.github/workflows/observe-prereleased.yml` and `.github/workflows/observe-published.yml` for prerelease event behavior (`#708`).
+  Configure an `ACTION_GH_RELEASE_TRIGGER_TOKEN` repo secret first; release workflows triggered with the default `GITHUB_TOKEN` are suppressed by GitHub and will not exercise the observer workflows.
 - Use `.github/workflows/repro-dotfile.yml` for dotfile asset-name behavior (`#741`).
 - Use `.github/workflows/repro-duplicate-asset.yml` for same-filename concurrent upload behavior (`#740`).
 - Use `.github/workflows/repro-windows.yml` for Windows-runner regressions (`#729`); treat it as an attempted reproduction unless the workflow actually fails with the reported credential error.
