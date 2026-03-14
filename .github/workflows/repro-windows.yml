@@ -1,0 +1,86 @@
+name: repro-windows
+run-name: repro-windows-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: v2.5.0
+
+permissions:
+  contents: write
+
+jobs:
+  repro:
+    runs-on: windows-latest
+    env:
+      TAG_NAME: v729.${{ github.run_id }}.${{ github.run_attempt }}1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Prepare asset
+        shell: pwsh
+        run: |
+          Set-Content -Path win-asset.txt -Value "windows repro $env:TAG_NAME"
+
+      - name: Attempt release from Windows
+        id: release
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Windows repro ${{ env.TAG_NAME }}
+          draft: true
+          prerelease: true
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          files: win-asset.txt
+
+      - name: Summarize Windows outcome
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const releaseOutcome = process.env.RELEASE_OUTCOME;
+            const tagName = process.env.TAG_NAME;
+            const { owner, repo } = context.repo;
+            let releaseId = null;
+            let releaseUrl = null;
+
+            try {
+              const { data: release } = await github.rest.repos.getReleaseByTag({
+                owner,
+                repo,
+                tag: tagName,
+              });
+              releaseId = release.id;
+              releaseUrl = release.html_url;
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
+
+            core.summary
+              .addHeading("Windows repro summary")
+              .addRaw(`Step outcome: ${releaseOutcome}\n`)
+              .addRaw(`Tag: ${tagName}\n`)
+              .addRaw(`Release id: ${releaseId ?? "missing"}\n`)
+              .addRaw(`Release url: ${releaseUrl ?? "missing"}\n`)
+              .write();

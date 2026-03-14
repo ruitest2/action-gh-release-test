@@ -1,0 +1,22 @@
+name: observe-published
+run-name: observe-published-${{ github.event.release.tag_name }}
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record published event
+        run: |
+          {
+            echo "Observed published event"
+            echo "Tag: ${{ github.event.release.tag_name }}"
+            echo "Run id: ${{ github.run_id }}"
+          } >> "$GITHUB_STEP_SUMMARY"

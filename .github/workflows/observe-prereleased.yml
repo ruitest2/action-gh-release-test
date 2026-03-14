@@ -1,0 +1,22 @@
+name: observe-prereleased
+run-name: observe-prereleased-${{ github.event.release.tag_name }}
+
+on:
+  release:
+    types:
+      - prereleased
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record prereleased event
+        run: |
+          {
+            echo "Observed prereleased event"
+            echo "Tag: ${{ github.event.release.tag_name }}"
+            echo "Run id: ${{ github.run_id }}"
+          } >> "$GITHUB_STEP_SUMMARY"

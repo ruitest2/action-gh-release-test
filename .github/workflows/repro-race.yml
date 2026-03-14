@@ -1,0 +1,152 @@
+name: repro-race
+run-name: repro-race-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: v2.5.0
+      worker_count:
+        description: Number of parallel workers to start at the same barrier
+        required: true
+        type: choice
+        options:
+          - "2"
+          - "4"
+          - "6"
+        default: "4"
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      barrier_epoch: ${{ steps.vars.outputs.barrier_epoch }}
+      tag_name: ${{ steps.vars.outputs.tag_name }}
+    steps:
+      - id: vars
+        run: |
+          echo "tag_name=v709.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+          echo "barrier_epoch=$(( $(date +%s) + 45 ))" >> "$GITHUB_OUTPUT"
+
+  worker:
+    if: ${{ matrix.slot <= fromJSON(inputs.worker_count) }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        slot: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Prepare worker asset
+        run: |
+          printf 'worker %s for %s\n' "${{ matrix.slot }}" "${{ needs.prepare.outputs.tag_name }}" > "asset-${{ matrix.slot }}.txt"
+
+      - name: Wait for barrier
+        env:
+          BARRIER_EPOCH: ${{ needs.prepare.outputs.barrier_epoch }}
+        run: |
+          while [ "$(date +%s)" -lt "$BARRIER_EPOCH" ]; do
+            sleep 1
+          done
+
+      - name: Attempt release update
+        id: release
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag_name }}
+          name: Race repro ${{ needs.prepare.outputs.tag_name }}
+          files: asset-${{ matrix.slot }}.txt
+
+      - name: Persist worker outcome
+        if: always()
+        run: |
+          cat <<'EOF' > "worker-${{ matrix.slot }}.json"
+          {
+            "slot": ${{ matrix.slot }},
+            "tag_name": "${{ needs.prepare.outputs.tag_name }}",
+            "outcome": "${{ steps.release.outcome }}"
+          }
+          EOF
+
+      - name: Upload worker outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-${{ matrix.slot }}
+          path: worker-${{ matrix.slot }}.json
+
+  inspect:
+    if: always()
+    needs:
+      - prepare
+      - worker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download worker outcomes
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: worker-results
+          pattern: worker-*
+
+      - name: Summarize releases and worker outcomes
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ needs.prepare.outputs.tag_name }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require("fs");
+            const path = require("path");
+            const { owner, repo } = context.repo;
+            const tagName = process.env.TAG_NAME;
+            const resultDir = path.join(process.env.GITHUB_WORKSPACE, "worker-results");
+            const workerResults = fs.existsSync(resultDir)
+              ? fs.readdirSync(resultDir)
+                  .filter((file) => file.endsWith(".json"))
+                  .sort()
+                  .map((file) => JSON.parse(fs.readFileSync(path.join(resultDir, file), "utf8")))
+              : [];
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              per_page: 100,
+              repo,
+            });
+            const matching = releases.filter((release) => release.tag_name === tagName);
+            const summary = {
+              tag_name: tagName,
+              worker_results: workerResults,
+              release_count: matching.length,
+              release_ids: matching.map((release) => release.id),
+              asset_names: matching.flatMap((release) =>
+                release.assets.map((asset) => asset.name),
+              ),
+            };
+
+            core.summary
+              .addHeading("Race repro summary")
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+
+            if (matching.length === 0) {
+              core.setFailed(`no releases found for ${tagName}`);
+            }

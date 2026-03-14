@@ -1,0 +1,90 @@
+name: repro-make-latest
+run-name: repro-make-latest-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: v2.5.0
+      expected_latest:
+        description: Which tag should remain latest after the candidate release
+        required: true
+        type: choice
+        options:
+          - previous
+          - current
+        default: current
+
+permissions:
+  contents: write
+
+jobs:
+  repro:
+    runs-on: ubuntu-latest
+    env:
+      PREVIOUS_TAG: v703.${{ github.run_id }}.${{ github.run_attempt }}1
+      CURRENT_TAG: v703.${{ github.run_id }}.${{ github.run_attempt }}2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Prepare assets
+        run: |
+          printf 'previous %s\n' "$PREVIOUS_TAG" > previous.txt
+          printf 'current %s\n' "$CURRENT_TAG" > current.txt
+
+      - name: Create previous release
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.PREVIOUS_TAG }}
+          name: Previous ${{ env.PREVIOUS_TAG }}
+          make_latest: true
+          files: previous.txt
+
+      - name: Create candidate release with make_latest false
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.CURRENT_TAG }}
+          name: Current ${{ env.CURRENT_TAG }}
+          make_latest: false
+          files: current.txt
+
+      - name: Assert latest release selection
+        uses: actions/github-script@v7
+        env:
+          CURRENT_TAG: ${{ env.CURRENT_TAG }}
+          EXPECTED_LATEST: ${{ inputs.expected_latest }}
+          PREVIOUS_TAG: ${{ env.PREVIOUS_TAG }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const currentTag = process.env.CURRENT_TAG;
+            const previousTag = process.env.PREVIOUS_TAG;
+            const expected = process.env.EXPECTED_LATEST;
+            const expectedTag = expected === "previous" ? previousTag : currentTag;
+            const { owner, repo } = context.repo;
+
+            const { data: latest } = await github.rest.repos.getLatestRelease({ owner, repo });
+
+            core.summary
+              .addHeading("Latest release check")
+              .addRaw(`Previous tag: ${previousTag}\n`)
+              .addRaw(`Current tag: ${currentTag}\n`)
+              .addRaw(`Observed latest tag: ${latest.tag_name}\n`)
+              .addRaw(`Expected latest tag: ${expectedTag}\n`)
+              .write();
+
+            if (latest.tag_name !== expectedTag) {
+              core.setFailed(`expected latest tag ${expectedTag}, got ${latest.tag_name}`);
+            }
