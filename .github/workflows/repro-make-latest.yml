@@ -32,8 +32,8 @@ jobs:
   repro:
     runs-on: ubuntu-latest
     env:
-      PREVIOUS_TAG: v703.${{ github.run_id }}.${{ github.run_attempt }}1
-      CURRENT_TAG: v703.${{ github.run_id }}.${{ github.run_attempt }}2
+      PREVIOUS_TAG: v999999.${{ github.run_id }}.${{ github.run_attempt }}1
+      CURRENT_TAG: v999999.${{ github.run_id }}.${{ github.run_attempt }}2
     steps:
       - uses: actions/checkout@v4
 
