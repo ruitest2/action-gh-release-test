@@ -21,6 +21,10 @@ on:
           - current
         default: current
 
+concurrency:
+  cancel-in-progress: false
+  group: repro-make-latest
+
 permissions:
   contents: write
 
