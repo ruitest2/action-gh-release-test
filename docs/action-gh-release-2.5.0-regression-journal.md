@@ -165,6 +165,15 @@ Recommended scope for the next bug-fix pass:
 
 ## Active Fix Candidates
 
+- PR `#750` `fix: clean up orphan drafts when tag creation is blocked`
+  - merge target: `https://github.com/softprops/action-gh-release/pull/750`
+  - upstream build: `https://github.com/softprops/action-gh-release/actions/runs/23100954970`
+  - verify: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100959572`
+  - tag used: `v722.23100959572.1`
+  - release repository: `chenrui333/action-gh-release`
+  - observed action failure: `Tag creation for v722.23100959572.1 is blocked by repository rules. Deleted draft release 297099915 to avoid leaving an orphaned draft release.`
+  - cleanup verification: no release and no temporary ruleset remained in `chenrui333/action-gh-release` after the run
+  - interpretation: the fix keeps the step failing for blocked tag creation, but it now cleans up the orphan draft instead of leaving a hidden draft release behind
 - PR `#746` `fix: canonicalize releases after concurrent create` is merged into `master`
   - merge target: `https://github.com/softprops/action-gh-release/pull/746`
   - verify: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23099930957`
