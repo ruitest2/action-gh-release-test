@@ -228,7 +228,7 @@ If a case still reproduces on current `master`, keep it in the `2.5.3` bucket. I
 
 Planned workflow-to-issue mapping:
 
-- `.github/workflows/repro-preserve-order.yml` for `#645`
+- `.github/workflows/repro-preserve-order.yml` for docs/usage confirmation around `preserve_order` behavior (`#645`)
 - `.github/workflows/repro-append-body.yml` for `#613`, `#216`, `#238`
 - `.github/workflows/repro-brace-glob.yml` for `#611`, `#204` and likely related unmatched-pattern parsing reports such as `#614` and `#280`
 - `.github/workflows/repro-remote-repo.yml` for `#639`, `#308`
@@ -240,7 +240,7 @@ Planned workflow-to-issue mapping:
 
 Current `master` sweep results against `softprops/action-gh-release@b25b93d384199fc0fc8c2e126b2d937a0cbeb2ae`:
 
-- `#645` still reproduces. `.github/workflows/repro-preserve-order.yml` failed on `23101335889` because the final asset order did not match the input order even with `preserve_order: true`.
+- `#645` still reproduces, but treat it as a docs/usage case rather than a runtime bug. `.github/workflows/repro-preserve-order.yml` failed on `23101335889`, and the refreshed run on current upstream `master` failed again on `23102016655`. A direct probe against `ruitest2/action-gh-release-test` uploaded draft-release assets in the order `z-last.txt`, `a-first.txt`, `m-middle.txt`, and GitHub returned them from the Releases API as `a-first.txt`, `m-middle.txt`, `z-last.txt`, so the final ordering is controlled by GitHub rather than by the action's upload loop.
 - `#613`, `#216`, and `#238` did not reproduce. `.github/workflows/repro-append-body.yml` passed on `23101335888`.
 - `#611` and `#204` did not reproduce. `.github/workflows/repro-brace-glob.yml` passed on `23101335887`.
 - The simple remote-repository path did not reproduce. `.github/workflows/repro-remote-repo.yml` passed on `23101335895`, so a straightforward `repository` + explicit `token` release still works.
@@ -251,7 +251,6 @@ Current `master` sweep results against `softprops/action-gh-release@b25b93d38419
 
 Initial `2.5.3` bug bucket from this sweep:
 
-- `#645`
 - `#571`
 - `#639`
 - `#542`
@@ -260,8 +259,7 @@ Planned fix order after the `2.5.2` sweep:
 
 1. `#639` token precedence
 2. `#571` seeded finalize/orphan-draft race
-3. `#645` preserve-order output and asset ordering
-4. `#542` Unicode and special-character asset naming, with `#393` checked alongside it
+3. `#542` Unicode and special-character asset naming, with `#393` checked alongside it
 
 Expected workflow for each fix:
 
@@ -278,12 +276,14 @@ Verification notes:
 - PR `#752` clarifies the token precedence docs in `action.yml` and `README.md`; it does not change runtime behavior.
 - `#541` has been reclassified as documentation rather than a runtime bug.
   `.github/workflows/repro-empty-token.yml` still failed on `23101560199` and `23101913008`, but the failure is the expected result of explicitly passing `token: ""` and overriding the default `${{ github.token }}` input. `softprops/action-gh-release@ff689a6` updates `README.md` and `action.yml` to call this out, and issue `#541` was relabeled `documentation` and closed.
+- `#645` has also been reclassified as documentation rather than a runtime bug.
+  `.github/workflows/repro-preserve-order.yml` still failed on `23102016655`, but a direct probe showed GitHub returning draft-release assets in a different order than they were uploaded. `softprops/action-gh-release@abb4370` updates `README.md` and `action.yml` to clarify that `preserve_order` only controls sequential upload behavior, and issue `#645` was relabeled `documentation` and closed.
 - PR `#753` (`chenrui333:finalize-draft-cleanup`, head `668685d61516413a52c2e3c11ed15fd50bb57f14`) folds the duplicate-draft cleanup path into one helper and has been merged as `0a2883678426c2aaf52462d2add978d6072df449`.
   `.github/workflows/repro-finalize-race.yml` passed on `23101838821`; the enabled workers all reported `success`, and tag `v709final.23101838821.1` ended with one published release (`297105698`) containing `finalize-asset-1.txt` through `finalize-asset-4.txt`.
   `.github/workflows/repro-race.yml` also passed on `23101838828` as a non-regression check for `#705`; the enabled workers all reported `success`, and tag `v709.23101838828.1` ended with one published release (`297105765`) containing `asset-1.txt` through `asset-4.txt`.
   Upstream `build` passed on `23101833668`.
-- Active next fix target: `#645`.
-  Re-run `.github/workflows/repro-preserve-order.yml` against current upstream `master` before opening the follow-up PR so the journal reflects the post-`#753` baseline.
+- Active next fix target: `#542`.
+  Re-run `.github/workflows/repro-unicode-asset.yml` against current upstream `master` before opening the follow-up PR so the journal reflects the post-`#645` docs baseline.
 
 ## Version Recommendation
 
