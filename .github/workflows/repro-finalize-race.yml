@@ -1,0 +1,193 @@
+name: repro-finalize-race
+run-name: repro-finalize-race-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: v2.5.0
+      worker_count:
+        description: Number of parallel workers to start at the same barrier
+        required: true
+        type: choice
+        options:
+          - "2"
+          - "4"
+          - "6"
+        default: "4"
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      barrier_epoch: ${{ steps.vars.outputs.barrier_epoch }}
+      tag_name: ${{ steps.vars.outputs.tag_name }}
+    steps:
+      - id: vars
+        run: |
+          echo "tag_name=v709final.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+          echo "barrier_epoch=$(( $(date +%s) + 45 ))" >> "$GITHUB_OUTPUT"
+
+  seed:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create seed draft release
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ needs.prepare.outputs.tag_name }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const tagName = process.env.TAG_NAME;
+            const created = await github.rest.repos.createRelease({
+              owner,
+              repo,
+              tag_name: tagName,
+              name: `Finalize repro ${tagName}`,
+              body: "Seed draft release for finalize-race reproduction",
+              draft: true,
+            });
+            core.info(`seed_release_id=${created.data.id}`);
+            core.setOutput("release_id", String(created.data.id));
+
+  worker:
+    needs:
+      - prepare
+      - seed
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        slot: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: guard
+        run: |
+          if [ "${{ matrix.slot }}" -le "${{ inputs.worker_count }}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.guard.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - if: steps.guard.outputs.enabled == 'true'
+        name: Prepare worker asset
+        run: |
+          printf 'worker %s for %s\n' "${{ matrix.slot }}" "${{ needs.prepare.outputs.tag_name }}" > "finalize-asset-${{ matrix.slot }}.txt"
+
+      - if: steps.guard.outputs.enabled == 'true'
+        name: Wait for barrier
+        env:
+          BARRIER_EPOCH: ${{ needs.prepare.outputs.barrier_epoch }}
+        run: |
+          while [ "$(date +%s)" -lt "$BARRIER_EPOCH" ]; do
+            sleep 1
+          done
+
+      - if: steps.guard.outputs.enabled == 'true'
+        name: Attempt release update
+        id: release
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag_name }}
+          name: Finalize repro ${{ needs.prepare.outputs.tag_name }}
+          files: finalize-asset-${{ matrix.slot }}.txt
+
+      - name: Persist worker outcome
+        if: always()
+        run: |
+          cat <<'EOF' > "worker-${{ matrix.slot }}.json"
+          {
+            "slot": ${{ matrix.slot }},
+            "tag_name": "${{ needs.prepare.outputs.tag_name }}",
+            "enabled": "${{ steps.guard.outputs.enabled }}",
+            "outcome": "${{ steps.release.outcome }}"
+          }
+          EOF
+
+      - name: Upload worker outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-${{ matrix.slot }}
+          path: worker-${{ matrix.slot }}.json
+
+  inspect:
+    if: always()
+    needs:
+      - prepare
+      - seed
+      - worker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download worker outcomes
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: worker-results
+          pattern: worker-*
+
+      - name: Summarize releases and worker outcomes
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ needs.prepare.outputs.tag_name }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require("fs");
+            const path = require("path");
+            const { owner, repo } = context.repo;
+            const tagName = process.env.TAG_NAME;
+            const resultDir = path.join(process.env.GITHUB_WORKSPACE, "worker-results");
+            const workerResults = fs.existsSync(resultDir)
+              ? fs.readdirSync(resultDir)
+                  .filter((file) => file.endsWith(".json"))
+                  .sort()
+                  .map((file) => JSON.parse(fs.readFileSync(path.join(resultDir, file), "utf8")))
+              : [];
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const matching = releases.filter((release) => release.tag_name === tagName);
+            const summary = {
+              tag_name: tagName,
+              worker_results: workerResults,
+              release_count: matching.length,
+              releases: matching.map((release) => ({
+                id: release.id,
+                draft: release.draft,
+                html_url: release.html_url,
+                asset_names: release.assets.map((asset) => asset.name),
+              })),
+            };
+
+            core.summary
+              .addHeading("Finalize race summary")
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+
+            if (matching.length !== 1) {
+              core.setFailed(`expected exactly one release for ${tagName}, found ${matching.length}`);
+            }

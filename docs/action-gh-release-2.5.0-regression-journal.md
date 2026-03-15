@@ -13,6 +13,7 @@ Use this journal as the current evidence set for the 2.5.0 bug cluster and the r
   - `.github/workflows/repro-assets-output.yml`
   - `.github/workflows/repro-make-latest.yml`
   - `.github/workflows/repro-race.yml`
+  - `.github/workflows/repro-finalize-race.yml`
   - `.github/workflows/repro-dotfile.yml`
   - `.github/workflows/repro-duplicate-asset.yml`
   - `.github/workflows/repro-windows.yml`
@@ -45,10 +46,9 @@ For the currently relevant PRs:
   - repro: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23097946267`
   - control (`v2.4.2`): `https://github.com/ruitest2/action-gh-release-test/actions/runs/23097932777`
   - fix candidate (`#715` branch): `https://github.com/ruitest2/action-gh-release-test/actions/runs/23097932786`
-- `#704` / `#709` finalize retry loop reproduced on `v2.5.0`
-  - repro: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23097859818`
-  - tag used: `v709.23097859818.1`
-  - outcome: four releases created for one tag, each holding one asset; several workers logged `retrying...` and `Too many retries.`
+- `#704` / `#709` should be treated as finalize-on-shared-release regressions, not the generic same-tag creation race
+  - use `.github/workflows/repro-finalize-race.yml` for fresh validation against `v2.5.0`, current `master`, and any fix branch
+  - the older `repro-race.yml` evidence is still useful for the broader race cluster, but it conflates `#704` / `#709` with `#705`
 
 ### Older or separate bugs
 
@@ -91,16 +91,16 @@ As of 2026-03-14, the following fix PRs are merged into `softprops/action-gh-rel
 - `#715` `fix: release marked as 'latest' despite make_latest: false`
 - `#725` `fix: use getReleaseByTag API instead of iterating all releases`
 
-That leaves the `#704` / `#709` race path as the primary remaining blocker for `2.5.1`.
+That leaves the race cluster as the primary remaining blocker for `2.5.1`, with `#704` / `#709` needing dedicated finalize-race validation and `#705` still confirmed independently.
 
 ## Next Execution Order
 
-1. Re-run `.github/workflows/repro-race.yml` against current `softprops/action-gh-release/master`
-2. Confirm whether the current `master` still reproduces `#704` / `#709`
+1. Re-run `.github/workflows/repro-race.yml` and `.github/workflows/repro-finalize-race.yml` against current `softprops/action-gh-release/master`
+2. Confirm which parts of the race cluster still reproduce on current `master`
 3. Build the fix in `softprops/action-gh-release` on a new PR branch
-4. Re-run `.github/workflows/repro-race.yml` and `.github/workflows/repro-duplicate-asset.yml` against that fix branch
+4. Re-run the relevant race workflows against that fix branch
 5. Label the fix PR `bug`
-6. Cut `2.5.1` only after the race repro is fixed or intentionally deferred
+6. Cut `2.5.1` only after the remaining race repro is fixed or intentionally deferred
 
 ## Version Recommendation
 

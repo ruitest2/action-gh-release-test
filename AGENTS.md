@@ -19,8 +19,9 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Keep the default `e2e.yml` for simple tag-based smoke testing of release creation and asset upload.
 - Use `.github/workflows/repro-make-latest.yml` for the `make_latest: false` regression and fix verification (`#703`, PR `#715`).
 - Use `.github/workflows/repro-assets-output.yml` for invalid `assets` output URLs and fix verification (`#713`, PR `#738`).
-- Use `.github/workflows/repro-race.yml` for parallel upload/finalization races (`#704`, `#705`, `#709`).
-  Re-run it against current upstream `master` before opening a race-fix PR so the journal reflects whether the bug still reproduces after the latest merged fixes.
+- Use `.github/workflows/repro-race.yml` for concurrent same-tag creation races (`#705`) and related duplicate-release checks.
+- Use `.github/workflows/repro-finalize-race.yml` for the draft-finalization retry path (`#704`, `#709`).
+  Re-run both against current upstream `master` before opening a race-fix PR so the journal reflects which race still reproduces after the latest merged fixes.
 - Use `.github/workflows/trigger-prerelease.yml` together with `.github/workflows/observe-prereleased.yml` and `.github/workflows/observe-published.yml` for prerelease event behavior (`#708`).
   Configure an `ACTION_GH_RELEASE_TRIGGER_TOKEN` repo secret first; release workflows triggered with the default `GITHUB_TOKEN` are suppressed by GitHub and will not exercise the observer workflows.
 - Use `.github/workflows/repro-dotfile.yml` for dotfile asset-name behavior (`#741`).
