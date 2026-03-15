@@ -115,7 +115,6 @@ The remaining confirmed race bug is the older shared-tag duplicate-release path 
 That means the next bug-fix round should no longer spend time on the `#704` / `#709` finalize path except as historical regression evidence.
 The remaining open bug cluster for the next release is:
 
-- `#741` dotfile asset name regression
 - `#740` same-filename concurrent upload race, if we still want explicit hardening beyond the `#705` fix
 - `#742` Node 24 runtime migration if we still want it in the `2.5.2` batch
 
@@ -132,10 +131,15 @@ Fresh `v2.5.1` baselines for the next bug-fix round:
     - no `observe-prereleased` run
     - `observe-published`: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100153414`
   - implication: current `master` still misses the `prereleased` event even though the release is published as a prerelease
+- `#741` reproduces on current `master`
+  - repro: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100306812`
+  - tag used: `v741.23100306812.11`
+  - outcome: the workflow failed when the expected displayed name was `.config`
+  - observed asset record: raw name `default.config`, empty label
 
 Recommended scope for `2.5.2`:
 
-1. Reproduce and fix `#741`
+1. Merge PR `#749` for `#741`
 2. Decide whether `#740` needs explicit hardening beyond the now-green `master` baseline
 3. Keep `#742` as follow-up work unless it naturally fits after the bug fixes
 
@@ -160,10 +164,18 @@ Recommended scope for `2.5.2`:
     - `observe-prereleased`: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100226375`
     - `observe-published`: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100226358`
   - interpretation: `#708` is fixed on current `master`; the next bug-fix round should move to `#741`
+- PR `#749` `fix: restore dotfile asset labels`
+  - branch under test: `chenrui333/action-gh-release@fix-741-dotfile-label`
+  - verify: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100387469`
+  - tag used: `v741.23100387469.11`
+  - observed asset record:
+    - raw name: `default.config`
+    - label: `.config`
+  - interpretation: this branch restores the displayed dotfile name while preserving GitHub's normalized raw asset name
 
 ## Next Execution Order
 
-1. Reproduce and fix `#741`
+1. Keep PR `#749` as the current `#741` fix candidate and re-run `.github/workflows/repro-dotfile.yml` if the branch changes
 2. Revisit `#740` only if we still want an explicit asset-race hardening PR after the now-green `master` baseline
 3. Keep labeling any new bug-fix PR `bug`
 
