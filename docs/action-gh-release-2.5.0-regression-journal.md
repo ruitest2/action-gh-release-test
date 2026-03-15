@@ -272,6 +272,13 @@ Expected workflow for each fix:
 4. Label the PR `bug`
 5. Final human check and merge only after the repro workflow passes
 
+Verification notes:
+
+- Draft PR `#751` (`chenrui333:token-selection-fix`, head `2654943c5bcc2249ea0a89eee11ac2b55040ddb8`) fixes the explicit-token precedence path for `#639`.
+  `.github/workflows/repro-token-precedence.yml` passed on `23101560200`, and upstream `build` passed on `23101555026`.
+- The same PR does not fully fix `#541`.
+  `.github/workflows/repro-empty-token.yml` still failed on `23101560199` with `Parameter token or opts.auth is required`, so `#541` stays open for a separate follow-up unless the intended contract is narrowed to cases where `GITHUB_TOKEN` is explicitly present in the environment.
+
 ## Version Recommendation
 
 If the next release only contains the remaining regression fixes and related test/docs work, use `2.5.2`.
