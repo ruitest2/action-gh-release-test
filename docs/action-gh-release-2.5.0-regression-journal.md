@@ -236,7 +236,7 @@ Planned workflow-to-issue mapping:
 - `.github/workflows/repro-assets-output.yml` as historical evidence for `#222`
 - `.github/workflows/repro-token-precedence.yml` for explicit `GITHUB_TOKEN` vs `token` input precedence (`#639`)
 - `.github/workflows/repro-empty-token.yml` for docs/usage confirmation around empty-string token passthrough (`#541`)
-- `.github/workflows/repro-unicode-asset.yml` for Unicode and special-character asset naming collisions (`#542`, likely related to `#393`)
+- `.github/workflows/repro-unicode-asset.yml` for docs/usage confirmation around Unicode and special-character asset naming (`#542`, likely related to `#393`)
 
 Current `master` sweep results against `softprops/action-gh-release@b25b93d384199fc0fc8c2e126b2d937a0cbeb2ae`:
 
@@ -247,19 +247,17 @@ Current `master` sweep results against `softprops/action-gh-release@b25b93d38419
 - `#571` still reproduces on the seeded-draft path. `.github/workflows/repro-finalize-race.yml` failed on `23101359678` because it left five releases for the same tag: one published release with all four assets plus four orphan drafts. The plain concurrent update path in `.github/workflows/repro-race.yml` passed on `23101359675`, so the remaining bug is specifically the finalize/seeded-draft branch rather than the general shared-tag upload path.
 - `#639` still reproduces when both `GITHUB_TOKEN` and an explicit `token` input are present. `.github/workflows/repro-token-precedence.yml` failed on `23101424352` with `Resource not accessible by integration`; the explicit PAT did not win over `GITHUB_TOKEN`.
 - `#541` still fails if the caller passes `token: ""`, but treat it as a docs/usage case rather than a runtime bug. `.github/workflows/repro-empty-token.yml` failed on `23101424341`, and the refreshed run on current upstream `master` failed again on `23101913008` with `Parameter token or opts.auth is required`; the action cannot recover `${{ github.token }}` after the caller explicitly overrides the input with an empty string.
-- `#542` still reproduces. `.github/workflows/repro-unicode-asset.yml` failed on `23101424357` because the uploaded Unicode/special-character assets were renamed or collapsed instead of remaining distinct.
+- `#542` still reproduces, but treat it as a docs/usage case rather than a runtime bug. `.github/workflows/repro-unicode-asset.yml` failed on `23101424357`, and the refreshed run on current upstream `master` failed again on `23102091717`. That run showed two GitHub/platform constraints rather than an action-only bug: literal filenames containing `[` were treated as glob patterns and skipped unless escaped, and GitHub rejected restoring the emoji filename via asset label with `label doesn't accept 4-byte Unicode`.
 
 Initial `2.5.3` bug bucket from this sweep:
 
 - `#571`
 - `#639`
-- `#542`
 
-Planned fix order after the `2.5.2` sweep:
+Shipped fix order after the `2.5.2` sweep:
 
 1. `#639` token precedence
 2. `#571` seeded finalize/orphan-draft race
-3. `#542` Unicode and special-character asset naming, with `#393` checked alongside it
 
 Expected workflow for each fix:
 
@@ -278,12 +276,14 @@ Verification notes:
   `.github/workflows/repro-empty-token.yml` still failed on `23101560199` and `23101913008`, but the failure is the expected result of explicitly passing `token: ""` and overriding the default `${{ github.token }}` input. `softprops/action-gh-release@ff689a6` updates `README.md` and `action.yml` to call this out, and issue `#541` was relabeled `documentation` and closed.
 - `#645` has also been reclassified as documentation rather than a runtime bug.
   `.github/workflows/repro-preserve-order.yml` still failed on `23102016655`, but a direct probe showed GitHub returning draft-release assets in a different order than they were uploaded. `softprops/action-gh-release@abb4370` updates `README.md` and `action.yml` to clarify that `preserve_order` only controls sequential upload behavior, and issue `#645` was relabeled `documentation` and closed.
+- `#542` has also been reclassified as documentation rather than a runtime bug.
+  `.github/workflows/repro-unicode-asset.yml` still failed on `23102091717`, but the failure breaks down into GitHub-side filename normalization/label limits and the fact that `files` is glob-based for literal bracket characters. `softprops/action-gh-release@26c9a93` updates `README.md` and `action.yml` to call this out, and issue `#542` was relabeled `documentation` and closed.
 - PR `#753` (`chenrui333:finalize-draft-cleanup`, head `668685d61516413a52c2e3c11ed15fd50bb57f14`) folds the duplicate-draft cleanup path into one helper and has been merged as `0a2883678426c2aaf52462d2add978d6072df449`.
   `.github/workflows/repro-finalize-race.yml` passed on `23101838821`; the enabled workers all reported `success`, and tag `v709final.23101838821.1` ended with one published release (`297105698`) containing `finalize-asset-1.txt` through `finalize-asset-4.txt`.
   `.github/workflows/repro-race.yml` also passed on `23101838828` as a non-regression check for `#705`; the enabled workers all reported `success`, and tag `v709.23101838828.1` ended with one published release (`297105765`) containing `asset-1.txt` through `asset-4.txt`.
   Upstream `build` passed on `23101833668`.
-- Active next fix target: `#542`.
-  Re-run `.github/workflows/repro-unicode-asset.yml` against current upstream `master` before opening the follow-up PR so the journal reflects the post-`#645` docs baseline.
+- The original `2.5.3` candidate bug bucket from this sweep is now exhausted.
+  The next runtime-fix target should come from a fresh sweep of still-open issues outside the `#639` / `#571` / docs-only cluster.
 
 ## Version Recommendation
 
