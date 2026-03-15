@@ -15,8 +15,14 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
 
 - Current upstream `master` state on 2026-03-15.
 - The existing regression evidence in `action-gh-release-2.5.0-regression-journal.md`.
-- Current upstream open work that looks relevant to a small, maintainable `2.6.0` train:
-  - `#654` Node 24 runtime upgrade
+- Current upstream code and contract surfaces:
+  - `src/github.ts`
+  - `src/util.ts`
+  - `README.md`
+  - `action.yml`
+  - `.github/workflows/main.yml`
+  - current tests under `__tests__/`
+- Current upstream open work that still looks relevant to a small, maintainable `2.6.0` train:
   - `#698` checked-in `dist/index.js` freshness verification
   - `#641` immutable-release compatibility
 
@@ -26,22 +32,81 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
 - Keep GitHub platform limits out of the active bug bucket unless current repro shows an action-side defect.
 - Require exact-ref regression evidence from this repo before treating a behavior change as ready.
 
+## Independent Codebase Findings
+
+### 1. `working_directory` exists in the action contract but is missing from the README inputs table
+
+- Finding source:
+  `action.yml`, `src/util.ts`, `src/main.ts`, and `__tests__/util.test.ts` all support `working_directory`, but the README input table does not document it.
+- Why it matters:
+  This is a user-visible contract drift. Callers can use the input successfully, but the main docs do not teach it or explain how it interacts with `files`.
+- Suggested `2.6.0` handling:
+  Small docs sync in the main repo. No runtime code change required.
+- Proposed regression coverage:
+  Keep the existing util tests and add a README or docs sync in the upstream change set. No new harness workflow needed.
+
+### 2. Concurrent upload retry cleanup only matches renamed assets by raw name, not by restored label
+
+- Finding source:
+  In `src/github.ts`, the normal overwrite path matches an existing asset by raw name, aligned name, or label, but the `422 already_exists` race retry path only looks for `alignAssetName(name)`.
+- Why it matters:
+  Dotfiles and other GitHub-renamed assets can restore their display label while keeping a normalized raw API name. In a concurrent upload race, the retry cleanup can miss that asset and fail to recover cleanly.
+- Suggested `2.6.0` handling:
+  Treat as a real bug-fix candidate. Reuse the same logical match rules in the race retry path that the ordinary overwrite path already uses.
+- Proposed regression coverage:
+  Add a targeted unit test in the upstream repo and extend `.github/workflows/repro-duplicate-asset.yml` or add a close sibling workflow that uses a renamed asset fixture such as `.config`.
+
+### 3. Immutable-release validation is not settled for prereleases
+
+- Finding source:
+  `src/github.ts` still creates prereleases without the forced draft-first path unless `draft: true` is explicitly requested.
+- Why it matters:
+  The current draft/finalize flow likely covers standard releases, but any immutable-release work must avoid reintroducing the previously fixed prerelease event regression from `#708`.
+- Suggested `2.6.0` handling:
+  Keep this as a verification-first item. Only change runtime behavior if a current repro shows that published prereleases are incompatible with GitHub's immutable-release rules in practice.
+- Proposed regression coverage:
+  Start with `.github/workflows/e2e.yml` and `.github/workflows/repro-existing-draft.yml`. If code is required, add a prerelease-specific harness path instead of changing semantics blindly.
+
+### 4. The main CI workflow still has the checked-dist drift guard commented out
+
+- Finding source:
+  `.github/workflows/main.yml` still has the uncommitted-change verification step commented out after `npm run build`.
+- Why it matters:
+  This repo ships checked-in `dist/index.js`. Without an automated drift check, maintainers can merge source changes without noticing a stale bundle.
+- Suggested `2.6.0` handling:
+  Keep `#698` active for the release train as a maintainer-safety improvement.
+- Proposed regression coverage:
+  Upstream CI-only validation. No external harness workflow required unless the check changes build behavior.
+
 ## Candidate Workstreams
 
-### 1. `#654` Upgrade the action runtime to Node 24
+### 1. Fix the renamed-asset race cleanup gap
 
-- Type: code quality and compatibility
+- Type: bug fix
 - Why it matters:
-  GitHub-hosted Actions runtimes are moving away from Node 20. This action should stay on a supported runtime without changing its user-facing contract.
+  Concurrent uploads already have a race-recovery path, but renamed assets appear to fall through a narrower match rule than the ordinary overwrite path.
 - Expected user-facing behavior:
-  `softprops/action-gh-release` continues to create, update, and finalize releases exactly as before, but runs on the `node24` Actions runtime without deprecation pressure.
+  Concurrent uploads of assets whose raw names are GitHub-normalized should recover the same way plain filenames do when `overwrite_files` remains enabled.
 - Proposed regression coverage:
-  - Upstream local checks: `npm run fmtcheck`, `npm run typecheck`, `npm run build`, `npm test`
-  - Harness smoke: `.github/workflows/e2e.yml` pinned to the exact upstream ref
+  - Upstream unit tests around `upload()`
+  - Harness validation using the duplicate-upload path with a renamed asset fixture
 - Current status:
-  Best near-term implementation candidate for `2.6.0`. This is a compatibility upgrade, not a behavior redesign.
+  Best independent bug-fix candidate found from current source review.
 
-### 2. `#698` Add a CI guard that verifies `dist/index.js` stays in sync
+### 2. Sync the public docs for `working_directory`
+
+- Type: docs and contract sync
+- Why it matters:
+  The input already works, but the main README contract is incomplete.
+- Expected user-facing behavior:
+  README users can discover and correctly use `working_directory` together with `files`.
+- Proposed regression coverage:
+  - Upstream docs sync only
+  - Rely on existing util tests for behavior coverage
+- Current status:
+  Small, low-risk `2.6.0` contract cleanup.
+
+### 3. `#698` Add a CI guard that verifies `dist/index.js` stays in sync
 
 - Type: code quality and supply-chain hardening
 - Why it matters:
@@ -52,20 +117,26 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
   - Upstream CI-only coverage in the main repo
   - No external harness workflow required unless the check changes build semantics
 - Current status:
-  Good `2.6.0` follow-on after the runtime upgrade because both touch the shipped bundle and maintainer workflow.
+  Good `2.6.0` maintainer-safety item once the first bug fix lands.
 
-### 3. `#641` Verify immutable-release compatibility and only code if current `master` still publishes too early
+### 4. `#641` Verify immutable-release compatibility and only code if current `master` still publishes too early
 
 - Type: feature validation or docs closeout, depending on current behavior
 - Why it matters:
-  If GitHub Immutable Releases blocks asset mutation after publish, the action must keep the release draft until uploads finish.
+  If GitHub Immutable Releases blocks asset mutation after publish, the action must keep the release draft until uploads finish without regressing prerelease events.
 - Expected user-facing behavior:
   Asset uploads complete against a draft release, then the action publishes the release once uploads are done.
 - Proposed regression coverage:
   - `.github/workflows/e2e.yml` for basic draft-to-publish smoke
   - `.github/workflows/repro-existing-draft.yml` for seeded draft reuse and publish behavior
+  - Add a prerelease-specific verifier only if current `master` actually fails
 - Current status:
-  Verify before coding. The current action already has explicit draft/finalize flow, so this may be a closeout or docs item rather than new implementation work.
+  Verify before coding. Current source review shows a likely prerelease tradeoff, so this stays behind proof.
+
+## Deferred Beyond `2.6.0`
+
+- `#654` Node 24 runtime upgrade:
+  treat as a `3.0.0` item because it changes the shipped GitHub Actions runtime contract rather than just tightening current `2.x` behavior.
 
 ## Not In The Active Runtime Bug Bucket Unless New Evidence Appears
 
@@ -78,9 +149,10 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
 
 ## Initial `2.6.0` Execution Order
 
-1. Advance the Node 24 runtime update as the first implementation candidate.
-2. Add or refresh the `dist/index.js` freshness guard after the runtime work settles.
-3. Re-verify immutable-release compatibility on current upstream before deciding whether `#641` needs code or only documentation.
+1. Fix the renamed-asset concurrent-upload cleanup gap.
+2. Sync the README for `working_directory`.
+3. Add or refresh the `dist/index.js` freshness guard.
+4. Re-verify immutable-release compatibility on current upstream before deciding whether `#641` needs code or only documentation.
 
 ## Regression Notes
 
@@ -92,4 +164,4 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
 
 - Journal created on 2026-03-15.
 - No `2.6.0` implementation has been declared done yet.
-- The first concrete implementation candidate is the Node 24 runtime upgrade from `#654`.
+- The first concrete implementation candidate is the renamed-asset concurrent-upload cleanup gap.
