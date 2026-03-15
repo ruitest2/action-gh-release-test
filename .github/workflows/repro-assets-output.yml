@@ -11,7 +11,7 @@ on:
       action_ref:
         description: Action ref to test
         required: true
-        default: v2.5.0
+        default: v2.6.0
       expected_url_kind:
         description: Expected output URL shape
         required: true
@@ -55,30 +55,73 @@ jobs:
         env:
           ASSETS_JSON: ${{ steps.release.outputs.assets }}
           EXPECTED_URL_KIND: ${{ inputs.expected_url_kind }}
+          RELEASE_ID: ${{ steps.release.outputs.id }}
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+          RELEASE_URL: ${{ steps.release.outputs.url }}
           TAG_NAME: ${{ env.TAG_NAME }}
+          UPLOAD_URL: ${{ steps.release.outputs.upload_url }}
         with:
           github-token: ${{ github.token }}
           script: |
+            const {
+              getReleaseByTagOrNull,
+              writeJsonSummary,
+            } = require(`${process.env.GITHUB_WORKSPACE}/scripts/release-harness.js`);
+            const { owner, repo } = context.repo;
             const assets = JSON.parse(process.env.ASSETS_JSON || "[]");
             const expected = process.env.EXPECTED_URL_KIND;
             const tagName = process.env.TAG_NAME;
+            const release = await getReleaseByTagOrNull({ github, owner, repo, tag: tagName });
+
+            const urls = assets.map((asset) => asset.browser_download_url || "");
+            const tagged = urls.every((url) => url.includes(`/releases/download/${tagName}/`));
+            const untagged = urls.every((url) => /\/releases\/download\/untagged-[a-z0-9]+\//.test(url));
+            const matches = expected === "tagged" ? tagged : untagged;
+            const summary = {
+              tag_name: tagName,
+              expected_url_kind: expected,
+              step_outcome: process.env.RELEASE_OUTCOME,
+              output_release_id: process.env.RELEASE_ID,
+              output_release_url: process.env.RELEASE_URL,
+              output_upload_url: process.env.UPLOAD_URL,
+              observed_release_id: release?.id ?? null,
+              observed_release_url: release?.html_url ?? null,
+              observed_upload_url: release?.upload_url ?? null,
+              asset_names: release?.assets.map((asset) => asset.name) ?? [],
+              asset_urls: urls,
+            };
+
+            await writeJsonSummary(core, "Asset output check", summary);
+
+            if (process.env.RELEASE_OUTCOME !== "success") {
+              core.setFailed("action did not create the release successfully");
+              return;
+            }
+
+            if (!release) {
+              core.setFailed(`no release found for ${tagName}`);
+              return;
+            }
 
             if (!Array.isArray(assets) || assets.length === 0) {
               core.setFailed("action did not emit any assets");
               return;
             }
 
-            const urls = assets.map((asset) => asset.browser_download_url || "");
-            const tagged = urls.every((url) => url.includes(`/releases/download/${tagName}/`));
-            const untagged = urls.every((url) => /\/releases\/download\/untagged-[a-z0-9]+\//.test(url));
-            const matches = expected === "tagged" ? tagged : untagged;
+            if (process.env.RELEASE_ID !== String(release.id)) {
+              core.setFailed("output id did not match the observed release id");
+              return;
+            }
 
-            core.summary
-              .addHeading("Asset output check")
-              .addRaw(`Tag: ${tagName}\n`)
-              .addRaw(`Expected URL kind: ${expected}\n`)
-              .addCodeBlock(JSON.stringify(urls, null, 2), "json")
-              .write();
+            if (process.env.RELEASE_URL !== release.html_url) {
+              core.setFailed("output url did not match the observed release html_url");
+              return;
+            }
+
+            if (process.env.UPLOAD_URL !== release.upload_url) {
+              core.setFailed("output upload_url did not match the observed release upload_url");
+              return;
+            }
 
             if (!matches) {
               core.setFailed(`asset URLs did not match expected ${expected} pattern`);

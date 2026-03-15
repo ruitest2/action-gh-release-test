@@ -11,7 +11,7 @@ on:
       action_ref:
         description: Action ref to test
         required: true
-        default: v2.5.0
+        default: v2.6.0
       asset_name:
         description: Asset filename to upload concurrently
         required: true

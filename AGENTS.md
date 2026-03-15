@@ -7,8 +7,10 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 
 - Keep the workflow intentionally small and focused on end-to-end release behavior.
 - Keep [TESTS.md](TESTS.md) current as the major user-facing regression matrix. Update it whenever a new workflow becomes the primary verifier for a feature surface or release path.
-- When testing a specific upstream PR or commit, pin `.github/workflows/e2e.yml` to the exact `softprops/action-gh-release` ref under test instead of relying on `master`.
+- Keep `v2.6.0` as the default released baseline in workflow inputs unless a newer released baseline intentionally replaces it.
+- When testing a specific upstream PR or commit, override the workflow `action_ref` with the exact `softprops/action-gh-release` ref under test. `e2e.yml` is the only push-only smoke workflow, so pin its `uses:` ref temporarily when you need an exact-ref smoke run.
 - Prefer disposable branches and unique tags for each regression run so the resulting workflow runs and releases are easy to trace.
+- Do not remove existing historical test tags, releases, or uploaded assets from this repo unless the user explicitly asks for cleanup. They are part of the external evidence set.
 - Keep `test-assets/` stable unless a regression case explicitly requires different fixtures.
 - When referring to upstream `softprops/action-gh-release` issues or PRs in this repo's docs, comments, or commit messages, wrap them in backticks like ``#112`` so GitHub does not auto-link them to this test repo's own issue namespace.
 - Do not turn this into a general development repo; it is a harness for validating upstream `action-gh-release` changes.
@@ -16,16 +18,17 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 ## Regression Workflow Map
 
 - Use `workflow_dispatch` on `main` and pass the exact upstream `action_repository` and `action_ref` under test.
+  Unless you are testing a newer exact ref, the workflow defaults should stay on released upstream `v2.6.0`.
 - If the upstream changes only exist locally in `$HOME/softprops/action-gh-release`, push them to a branch or fork first; this repo's workflows check out a remote ref.
 - Start with `docs/action-gh-release-2.5.0-regression-journal.md` when you need the current evidence set, merge order, or known harness limitations for the 2.5.0 bug cluster.
   After `v2.5.1`, treat that journal as the running plan for the next bug-fix round as well; it records which regressions were fixed in `2.5.1` and which open bugs remain.
-- Keep the default `e2e.yml` for simple tag-based smoke testing of release creation and asset upload.
+- Keep the default `e2e.yml` for simple tag-based smoke testing of release creation and asset upload on released upstream `v2.6.0`.
 - Use `.github/workflows/repro-make-latest.yml` for the `make_latest: false` regression and fix verification (`#703`, PR `#715`).
 - Use `.github/workflows/repro-assets-output.yml` for invalid `assets` output URLs and fix verification (`#713`, `#222`, PR `#738`).
-  Current fixed versions should emit tagged release-asset URLs, so keep the workflow default on `expected_url_kind: tagged` unless you are intentionally reproducing the old broken behavior.
+  It is the primary Linux verifier for the release outputs contract: `assets`, `url`, `id`, and `upload_url`. Keep the workflow default on `expected_url_kind: tagged` unless you are intentionally reproducing the old broken behavior.
 - Use `.github/workflows/repro-race.yml` for concurrent same-tag creation races (`#705`) and related duplicate-release checks such as `#140`, `#146`, `#215`, and `#375`.
 - Use `.github/workflows/repro-finalize-race.yml` for the draft-finalization retry path (`#704`, `#709`).
-  Re-run both against current upstream `master` before opening a race-fix PR so the journal reflects which race still reproduces after the latest merged fixes.
+  Re-run both against released upstream `v2.6.0` or the exact upstream ref under test before opening a race-fix PR so the journal reflects which race still reproduces after the latest merged fixes.
 - Use `.github/workflows/trigger-prerelease.yml` together with `.github/workflows/observe-prereleased.yml` and `.github/workflows/observe-published.yml` for prerelease event behavior (`#708`).
   Configure an `ACTION_GH_RELEASE_TRIGGER_TOKEN` repo secret first; release workflows triggered with the default `GITHUB_TOKEN` are suppressed by GitHub and will not exercise the observer workflows.
 - Use `.github/workflows/repro-dotfile.yml` for dotfile asset-name behavior (`#741`).
@@ -38,6 +41,8 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
   Do not keep `#645` in the active bug-fix bucket unless the workflow shows an action-level ordering defect rather than GitHub's own release-asset ordering.
 - Use `.github/workflows/repro-append-body.yml` for existing-release update and `append_body` behavior (`#613`, `#216`, `#238`).
 - Use `.github/workflows/repro-assets-output-windows.yml` for Windows `outputs.assets` checks (`#222`).
+- Use `.github/workflows/repro-home-tilde.yml` for consolidated path-resolution verification.
+  Run `path_case: home-tilde` for home-directory expansion (`#368`) and `path_case: working-directory` for end-to-end `working_directory` resolution.
 - Use `.github/workflows/repro-brace-glob.yml` for brace/comma glob parsing (`#611`, `#204`).
 - Use `.github/workflows/repro-windows-glob.yml` for Windows backslash-heavy file glob behavior (`#280`, `#614`, `#311`).
 - Use `.github/workflows/repro-remote-repo.yml` for remote-repository release creation and asset upload (`#639`, `#308`).
@@ -50,7 +55,6 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
   For immutable-release verification (`#641`), enable immutable releases on this repo, run `repro-draft-false.yml` with `expected_release_outcome: failure`, and pair it with `repro-existing-draft.yml` in `draft_mode: publish` to confirm the failure is limited to brand-new prereleases. The local maintainer toggle is `gh api -H 'X-GitHub-Api-Version: 2022-11-28' -X PUT repos/ruitest2/action-gh-release-test/immutable-releases` to enable and the matching `-X DELETE` call to disable.
 - Use `.github/workflows/repro-omit-name.yml` for omitted-name update behavior against an existing tagged release (`#363`).
 - Use `.github/workflows/repro-existing-release-ref-tag.yml` for `tag_name: refs/tags/...` update behavior (`#403`).
-- Use `.github/workflows/repro-home-tilde.yml` for home-directory path expansion (`#368`).
 - Use `.github/workflows/repro-body-too-long.yml` for large body handling and env-size stress around release notes (`#374`, `#471`).
 - Use `.github/workflows/repro-many-files.yml` for large asset-count behavior (`#335`).
 - Use `.github/workflows/repro-paren-asset.yml` for parentheses filename handling on Windows (`#393`).

@@ -11,7 +11,7 @@ on:
       action_ref:
         description: Action ref to test
         required: true
-        default: master
+        default: v2.6.0
 
 permissions:
   contents: write
@@ -55,9 +55,11 @@ jobs:
             exit 1
           fi
 
-          echo "current_sha=${shas[0]}" >> "$GITHUB_OUTPUT"
-          echo "latest_sha=${shas[1]}" >> "$GITHUB_OUTPUT"
-          echo "previous_sha=${shas[2]}" >> "$GITHUB_OUTPUT"
+          {
+            echo "current_sha=${shas[0]}"
+            echo "latest_sha=${shas[1]}"
+            echo "previous_sha=${shas[2]}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Prepare asset
         run: |

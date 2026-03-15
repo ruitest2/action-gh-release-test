@@ -11,7 +11,7 @@ on:
       action_ref:
         description: Action ref to test
         required: true
-        default: v2.5.0
+        default: v2.6.0
       worker_count:
         description: Number of parallel workers to start at the same barrier
         required: true
@@ -75,8 +75,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - id: guard
+        env:
+          SLOT: ${{ matrix.slot }}
+          WORKER_COUNT: ${{ inputs.worker_count }}
         run: |
-          if [ "${{ matrix.slot }}" -le "${{ inputs.worker_count }}" ]; then
+          if [ "$SLOT" -le "$WORKER_COUNT" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"

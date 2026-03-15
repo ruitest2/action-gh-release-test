@@ -11,7 +11,7 @@ on:
       action_ref:
         description: Action ref to test
         required: true
-        default: master
+        default: v2.6.0
       draft_mode:
         description: Whether the action should keep the seeded draft or publish it after reuse
         required: true

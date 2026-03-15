@@ -1,5 +1,5 @@
-name: repro-home-tilde
-run-name: repro-home-tilde-${{ inputs.action_ref }}
+name: repro-path-resolution
+run-name: repro-path-resolution-${{ inputs.action_ref }}-${{ inputs.path_case }}
 
 on:
   workflow_dispatch:
@@ -11,7 +11,15 @@ on:
       action_ref:
         description: Action ref to test
         required: true
-        default: master
+        default: v2.6.0
+      path_case:
+        description: Path-resolution case to verify
+        required: true
+        type: choice
+        options:
+          - home-tilde
+          - working-directory
+        default: home-tilde
 
 permissions:
   contents: write
@@ -20,7 +28,7 @@ jobs:
   repro:
     runs-on: ubuntu-latest
     env:
-      TAG_NAME: v368.${{ github.run_id }}.${{ github.run_attempt }}
+      TAG_NAME: vpath.${{ github.run_id }}.${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,91 +38,89 @@ jobs:
           ref: ${{ inputs.action_ref }}
           path: action-under-test
 
-      - name: Prepare asset under home directory
+      - name: Prepare path resolution asset
+        env:
+          PATH_CASE: ${{ inputs.path_case }}
         run: |
-          printf 'tilde repro %s\n' "$TAG_NAME" > "$HOME/home-asset.txt"
+          case "$PATH_CASE" in
+            home-tilde)
+              printf 'tilde repro %s\n' "$TAG_NAME" > "$HOME/home-asset.txt"
+              ;;
+            working-directory)
+              mkdir -p release-assets/nested
+              printf 'working directory repro %s\n' "$TAG_NAME" > release-assets/nested/workdir-asset.txt
+              ;;
+            *)
+              echo "unsupported path case: $PATH_CASE" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Attempt release with tilde path
-        id: release
+        id: release_home
+        if: inputs.path_case == 'home-tilde'
         continue-on-error: true
         uses: ./action-under-test
         with:
           tag_name: ${{ env.TAG_NAME }}
-          name: Home path repro ${{ env.TAG_NAME }}
+          name: Path resolution repro ${{ env.TAG_NAME }}
           files: ~/home-asset.txt
 
-      - name: Assert home asset uploaded
+      - name: Attempt release with working_directory
+        id: release_working_directory
+        if: inputs.path_case == 'working-directory'
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Path resolution repro ${{ env.TAG_NAME }}
+          working_directory: release-assets
+          files: nested/workdir-asset.txt
+
+      - name: Assert path resolution asset uploaded
         if: always()
         uses: actions/github-script@v7
         env:
+          HOME_OUTCOME: ${{ steps.release_home.outcome }}
+          PATH_CASE: ${{ inputs.path_case }}
+          WORKDIR_OUTCOME: ${{ steps.release_working_directory.outcome }}
           TAG_NAME: ${{ env.TAG_NAME }}
-          RELEASE_OUTCOME: ${{ steps.release.outcome }}
         with:
           github-token: ${{ github.token }}
           script: |
+            const {
+              getReleaseByTagOrNull,
+              writeJsonSummary,
+            } = require(`${process.env.GITHUB_WORKSPACE}/scripts/release-harness.js`);
             const { owner, repo } = context.repo;
-            let release = null;
-            try {
-              const response = await github.rest.repos.getReleaseByTag({
-                owner,
-                repo,
-                tag: process.env.TAG_NAME,
-              });
-              release = response.data;
-            } catch (error) {
-              if (error.status !== 404) {
-                throw error;
-              }
-            }
+            const pathCase = process.env.PATH_CASE;
+            const expectedAssetName =
+              pathCase === "working-directory" ? "workdir-asset.txt" : "home-asset.txt";
+            const releaseOutcome =
+              pathCase === "working-directory"
+                ? process.env.WORKDIR_OUTCOME
+                : process.env.HOME_OUTCOME;
+            const release = await getReleaseByTagOrNull({
+              github,
+              owner,
+              repo,
+              tag: process.env.TAG_NAME,
+            });
             const summary = {
               tag_name: process.env.TAG_NAME,
-              step_outcome: process.env.RELEASE_OUTCOME,
+              path_case: pathCase,
+              step_outcome: releaseOutcome,
               release_id: release?.id ?? null,
               asset_names: release?.assets.map((asset) => asset.name) ?? [],
             };
 
-            core.summary
-              .addHeading("Home tilde summary")
-              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
-              .write();
+            await writeJsonSummary(core, "Path resolution summary", summary);
 
-            if (!release?.assets.some((asset) => asset.name === "home-asset.txt")) {
-              core.setFailed("tilde path did not upload the home asset");
+            if (releaseOutcome !== "success") {
+              core.setFailed(`path-case ${pathCase} did not succeed`);
+              return;
             }
 
-      - name: Cleanup release and tag
-        if: always()
-        uses: actions/github-script@v7
-        env:
-          TAG_NAME: ${{ env.TAG_NAME }}
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const { owner, repo } = context.repo;
-            try {
-              const { data: release } = await github.rest.repos.getReleaseByTag({
-                owner,
-                repo,
-                tag: process.env.TAG_NAME,
-              });
-              await github.rest.repos.deleteRelease({
-                owner,
-                repo,
-                release_id: release.id,
-              });
-            } catch (error) {
-              if (error.status !== 404) {
-                throw error;
-              }
-            }
-            try {
-              await github.request("DELETE /repos/{owner}/{repo}/git/refs/{ref}", {
-                owner,
-                repo,
-                ref: `tags/${process.env.TAG_NAME}`,
-              });
-            } catch (error) {
-              if (error.status !== 404) {
-                throw error;
-              }
+            if (!release?.assets.some((asset) => asset.name === expectedAssetName)) {
+              core.setFailed(`path-case ${pathCase} did not upload ${expectedAssetName}`);
             }
