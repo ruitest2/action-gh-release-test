@@ -22,11 +22,11 @@ jobs:
     env:
       TAG_NAME: v411.${{ github.run_id }}.${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 50
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}

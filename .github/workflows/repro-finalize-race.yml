@@ -72,7 +72,7 @@ jobs:
       matrix:
         slot: [1, 2, 3, 4, 5, 6]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - id: guard
         env:
@@ -86,7 +86,7 @@ jobs:
           fi
 
       - if: steps.guard.outputs.enabled == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}
@@ -130,7 +130,7 @@ jobs:
 
       - name: Upload worker outcome
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: worker-${{ matrix.slot }}
           path: worker-${{ matrix.slot }}.json
@@ -144,7 +144,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download worker outcomes
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           merge-multiple: true
           path: worker-results

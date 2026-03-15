@@ -23,9 +23,9 @@ jobs:
       TAG_NAME: v363.${{ github.run_id }}.${{ github.run_attempt }}
       SEEDED_NAME: Seeded Fancy Name
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}

@@ -35,9 +35,9 @@ jobs:
       PREVIOUS_TAG: v999999.${{ github.run_id }}.${{ github.run_attempt }}1
       CURRENT_TAG: v999999.${{ github.run_id }}.${{ github.run_attempt }}2
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}

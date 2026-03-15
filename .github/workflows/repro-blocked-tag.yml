@@ -27,9 +27,9 @@ jobs:
       TAG_NAME: v722.${{ github.run_id }}.${{ github.run_attempt }}
       RELEASE_REPOSITORY: ${{ inputs.release_repository }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}

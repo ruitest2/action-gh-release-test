@@ -23,9 +23,9 @@ jobs:
       TAG_NAME: v645.${{ github.run_id }}.${{ github.run_attempt }}
       EXPECTED_ORDER_JSON: '["z-last.txt","a-first.txt","m-middle.txt"]'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}

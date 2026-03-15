@@ -24,11 +24,11 @@ jobs:
       LATEST_TAG_NAME: v372latest.${{ github.run_id }}.${{ github.run_attempt }}
       PREVIOUS_TAG_NAME: v372previous.${{ github.run_id }}.${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 80
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}

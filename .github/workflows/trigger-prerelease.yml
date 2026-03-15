@@ -42,9 +42,9 @@ jobs:
       HAS_TRIGGER_TOKEN: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN != '' }}
       TAG_NAME: v708.${{ github.run_id }}.${{ github.run_attempt }}-rc.1
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}
