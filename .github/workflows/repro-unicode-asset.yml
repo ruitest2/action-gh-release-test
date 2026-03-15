@@ -23,9 +23,9 @@ jobs:
       TAG_NAME: v542.${{ github.run_id }}.${{ github.run_attempt }}
       EXPECTED_ASSETS_JSON: '["emoji-🙂.pdf","bracket-[demo].pdf"]'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}
@@ -51,7 +51,7 @@ jobs:
 
       - name: Summarize unicode asset outcome
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           TAG_NAME: ${{ env.TAG_NAME }}
           EXPECTED_ASSETS_JSON: ${{ env.EXPECTED_ASSETS_JSON }}
@@ -94,7 +94,7 @@ jobs:
 
       - name: Cleanup draft release
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           TAG_NAME: ${{ env.TAG_NAME }}
         with:

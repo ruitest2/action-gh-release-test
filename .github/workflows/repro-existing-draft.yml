@@ -26,9 +26,9 @@ jobs:
     env:
       TAG_NAME: v163.${{ github.run_id }}.${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}
@@ -40,7 +40,7 @@ jobs:
 
       - name: Seed draft release
         id: seed
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           TAG_NAME: ${{ env.TAG_NAME }}
         with:
@@ -78,7 +78,7 @@ jobs:
 
       - name: Assert seeded draft behavior
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           DRAFT_MODE: ${{ inputs.draft_mode }}
           SEEDED_RELEASE_ID: ${{ steps.seed.outputs.release_id }}
@@ -126,7 +126,7 @@ jobs:
 
       - name: Cleanup releases and tag
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           TAG_NAME: ${{ env.TAG_NAME }}
         with:

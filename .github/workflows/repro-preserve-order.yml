@@ -23,9 +23,9 @@ jobs:
       TAG_NAME: v645.${{ github.run_id }}.${{ github.run_attempt }}
       EXPECTED_ORDER_JSON: '["z-last.txt","a-first.txt","m-middle.txt"]'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}
@@ -54,7 +54,7 @@ jobs:
 
       - name: Summarize preserve_order outcome
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           RELEASE_OUTCOME: ${{ steps.release.outcome }}
           TAG_NAME: ${{ env.TAG_NAME }}
@@ -93,7 +93,7 @@ jobs:
 
       - name: Cleanup draft release
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           TAG_NAME: ${{ env.TAG_NAME }}
         with:

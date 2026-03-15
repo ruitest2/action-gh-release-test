@@ -30,9 +30,9 @@ jobs:
     env:
       TAG_NAME: v713.${{ github.run_id }}.${{ github.run_attempt }}1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}
@@ -51,7 +51,7 @@ jobs:
           files: asset.txt
 
       - name: Assert emitted asset URLs
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           ASSETS_JSON: ${{ steps.release.outputs.assets }}
           EXPECTED_URL_KIND: ${{ inputs.expected_url_kind }}

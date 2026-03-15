@@ -35,9 +35,9 @@ jobs:
       PREVIOUS_TAG: v999999.${{ github.run_id }}.${{ github.run_attempt }}1
       CURRENT_TAG: v999999.${{ github.run_id }}.${{ github.run_attempt }}2
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}
@@ -65,7 +65,7 @@ jobs:
           files: current.txt
 
       - name: Assert latest release selection
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           CURRENT_TAG: ${{ env.CURRENT_TAG }}
           EXPECTED_LATEST: ${{ inputs.expected_latest }}

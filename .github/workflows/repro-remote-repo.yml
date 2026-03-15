@@ -27,9 +27,9 @@ jobs:
       TAG_NAME: v639.${{ github.run_id }}.${{ github.run_attempt }}
       RELEASE_REPOSITORY: ${{ inputs.release_repository }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}
@@ -54,7 +54,7 @@ jobs:
       - name: Summarize remote repo outcome
         id: inspect
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
           script: |
@@ -94,7 +94,7 @@ jobs:
 
       - name: Cleanup remote draft release
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           RELEASE_ID: ${{ steps.inspect.outputs.release_id }}
         with:

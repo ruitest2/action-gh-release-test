@@ -22,9 +22,9 @@ jobs:
     env:
       TAG_NAME: v403.${{ github.run_id }}.${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}
@@ -36,7 +36,7 @@ jobs:
 
       - name: Seed existing release
         id: seed
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           TAG_NAME: ${{ env.TAG_NAME }}
         with:
@@ -62,7 +62,7 @@ jobs:
 
       - name: Assert existing release was reused
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           SEEDED_RELEASE_ID: ${{ steps.seed.outputs.release_id }}
           TAG_NAME: ${{ env.TAG_NAME }}
@@ -100,7 +100,7 @@ jobs:
 
       - name: Cleanup release and tag
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           TAG_NAME: ${{ env.TAG_NAME }}
         with:

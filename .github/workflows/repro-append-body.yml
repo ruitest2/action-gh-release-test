@@ -24,16 +24,16 @@ jobs:
       BASE_BODY: "seed body"
       EXTRA_BODY: "extra body from append"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}
           path: action-under-test
 
       - name: Seed existing release
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           TAG_NAME: ${{ env.TAG_NAME }}
           BASE_BODY: ${{ env.BASE_BODY }}
@@ -62,7 +62,7 @@ jobs:
 
       - name: Summarize append_body outcome
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           RELEASE_OUTCOME: ${{ steps.release.outcome }}
           TAG_NAME: ${{ env.TAG_NAME }}
@@ -97,7 +97,7 @@ jobs:
 
       - name: Cleanup release and tag
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           TAG_NAME: ${{ env.TAG_NAME }}
         with:

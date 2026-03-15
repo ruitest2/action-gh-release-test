@@ -23,9 +23,9 @@ jobs:
       TAG_NAME: v363.${{ github.run_id }}.${{ github.run_attempt }}
       SEEDED_NAME: Seeded Fancy Name
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}
@@ -37,7 +37,7 @@ jobs:
 
       - name: Seed release with custom name
         id: seed
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           TAG_NAME: ${{ env.TAG_NAME }}
           SEEDED_NAME: ${{ env.SEEDED_NAME }}
@@ -65,7 +65,7 @@ jobs:
 
       - name: Assert seeded release was reused
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           SEEDED_NAME: ${{ env.SEEDED_NAME }}
           SEEDED_RELEASE_ID: ${{ steps.seed.outputs.release_id }}
@@ -106,7 +106,7 @@ jobs:
 
       - name: Cleanup release and tag
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           TAG_NAME: ${{ env.TAG_NAME }}
         with:
