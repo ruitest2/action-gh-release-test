@@ -486,3 +486,12 @@ Plan:
    That variant should confirm whether current `master` already reuses the seeded draft and publishes it after upload when `draft` is omitted.
 3. Only rebase and rework PR `#245` if one of those current-behavior checks fails.
    If both pass on current `master`, treat the PR as obsolete and avoid reviving stale draft-release logic.
+
+Progress update:
+
+- `.github/workflows/repro-existing-draft.yml` passed on `23104088782` with `draft_mode: keep`.
+  That run confirmed current `master` still reuses the seeded release ID, leaves it draft, and uploads `draft-asset.txt` when `draft: true` remains set.
+- `.github/workflows/repro-existing-draft.yml` also passed on `23104088778` with `draft_mode: publish`.
+  That run confirmed current `master` reuses the same seeded draft release and publishes it after upload when the `draft` input is omitted.
+- Current result: the original behavior target of PR `#245` is already covered by current `master`, so there is no remaining upstream feature gap to rebase.
+- The only follow-up worth considering is a small docs clarification in upstream `README.md` / `action.yml` so users understand the keep-vs-publish behavior for reused draft releases.
