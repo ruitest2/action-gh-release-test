@@ -413,6 +413,6 @@ Progress update:
 - `#754` merged on upstream `master` as `21ae1a1` and fixed the Windows glob family (`#280`, `#614`, `#311`).
 - `#755` merged on upstream `master` as `45211ba` and fixed `refs/tags/...` tag normalization/reuse for `#403`.
 - The rebased PR head `413200b` passed `.github/workflows/repro-existing-release-ref-tag.yml` in run `23103004409`, and upstream run `23103004159` was green before merge.
-- `#756` is the active PR for `#368` on branch `home-tilde`.
-- PR head `88e03fa` passed `.github/workflows/repro-home-tilde.yml` in run `23103057838`.
-- Upstream PR run `23103058361` is green, and the consumer repro now uploads `~/home-asset.txt` successfully.
+- `#756` merged on upstream `master` as `37f7a20` and fixed `~/...` file-path expansion for `#368`.
+- PR head `88e03fa` passed `.github/workflows/repro-home-tilde.yml` in run `23103057838`, and upstream run `23103058361` was green before merge.
+- The active next fix is `#393`, using `.github/workflows/repro-paren-asset.yml` as the verifier.
