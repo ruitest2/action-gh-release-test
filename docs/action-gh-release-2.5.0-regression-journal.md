@@ -238,6 +238,25 @@ Planned workflow-to-issue mapping:
 - `.github/workflows/repro-empty-token.yml` for empty-string token passthrough (`#541`)
 - `.github/workflows/repro-unicode-asset.yml` for Unicode and special-character asset naming collisions (`#542`, likely related to `#393`)
 
+Current `master` sweep results against `softprops/action-gh-release@b25b93d384199fc0fc8c2e126b2d937a0cbeb2ae`:
+
+- `#645` still reproduces. `.github/workflows/repro-preserve-order.yml` failed on `23101335889` because the final asset order did not match the input order even with `preserve_order: true`.
+- `#613`, `#216`, and `#238` did not reproduce. `.github/workflows/repro-append-body.yml` passed on `23101335888`.
+- `#611` and `#204` did not reproduce. `.github/workflows/repro-brace-glob.yml` passed on `23101335887`.
+- The simple remote-repository path did not reproduce. `.github/workflows/repro-remote-repo.yml` passed on `23101335895`, so a straightforward `repository` + explicit `token` release still works.
+- `#571` still reproduces on the seeded-draft path. `.github/workflows/repro-finalize-race.yml` failed on `23101359678` because it left five releases for the same tag: one published release with all four assets plus four orphan drafts. The plain concurrent update path in `.github/workflows/repro-race.yml` passed on `23101359675`, so the remaining bug is specifically the finalize/seeded-draft branch rather than the general shared-tag upload path.
+- `#639` still reproduces when both `GITHUB_TOKEN` and an explicit `token` input are present. `.github/workflows/repro-token-precedence.yml` failed on `23101424352` with `Resource not accessible by integration`; the explicit PAT did not win over `GITHUB_TOKEN`.
+- `#541` still reproduces. `.github/workflows/repro-empty-token.yml` failed on `23101424341`, so an empty-string `token` input still does not fall back to the default token path.
+- `#542` still reproduces. `.github/workflows/repro-unicode-asset.yml` failed on `23101424357` because the uploaded Unicode/special-character assets were renamed or collapsed instead of remaining distinct.
+
+Initial `2.5.3` bug bucket from this sweep:
+
+- `#645`
+- `#571`
+- `#639`
+- `#541`
+- `#542`
+
 ## Version Recommendation
 
 If the next release only contains the remaining regression fixes and related test/docs work, use `2.5.2`.
