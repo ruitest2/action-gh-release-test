@@ -1,0 +1,121 @@
+name: repro-body-too-long
+run-name: repro-body-too-long-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: master
+
+permissions:
+  contents: write
+
+jobs:
+  repro:
+    runs-on: ubuntu-latest
+    env:
+      TAG_NAME: v374.${{ github.run_id }}.${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Prepare oversized body
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          Path("body.md").write_text("x" * 130500, encoding="utf-8")
+          PY
+
+      - name: Attempt release with oversized body
+        id: release
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          body_path: body.md
+
+      - name: Fail if oversized body still breaks release creation
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            let releaseId = null;
+            try {
+              const { data: release } = await github.rest.repos.getReleaseByTag({
+                owner,
+                repo,
+                tag: process.env.TAG_NAME,
+              });
+              releaseId = release.id;
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
+            const summary = {
+              tag_name: process.env.TAG_NAME,
+              step_outcome: process.env.RELEASE_OUTCOME,
+              release_id: releaseId,
+            };
+
+            core.summary
+              .addHeading("Body too long summary")
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+
+            if (process.env.RELEASE_OUTCOME !== "success") {
+              core.setFailed("oversized body still fails on current upstream");
+            }
+
+      - name: Cleanup release and tag
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            try {
+              const { data: release } = await github.rest.repos.getReleaseByTag({
+                owner,
+                repo,
+                tag: process.env.TAG_NAME,
+              });
+              await github.rest.repos.deleteRelease({
+                owner,
+                repo,
+                release_id: release.id,
+              });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
+            try {
+              await github.request("DELETE /repos/{owner}/{repo}/git/refs/{ref}", {
+                owner,
+                repo,
+                ref: `tags/${process.env.TAG_NAME}`,
+              });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }

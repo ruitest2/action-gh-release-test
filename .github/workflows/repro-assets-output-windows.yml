@@ -1,0 +1,109 @@
+name: repro-assets-output-windows
+run-name: repro-assets-output-windows-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: master
+
+permissions:
+  contents: write
+
+jobs:
+  repro:
+    runs-on: windows-latest
+    env:
+      TAG_NAME: v222.${{ github.run_id }}.${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Prepare asset
+        shell: pwsh
+        run: |
+          Set-Content -Path Release.txt -Value "assets output repro $env:TAG_NAME"
+
+      - name: Attempt release and capture outputs
+        id: release
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          files: Release.txt
+
+      - name: Assert assets output is populated
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          ASSETS_JSON: ${{ steps.release.outputs.assets }}
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const raw = process.env.ASSETS_JSON || "[]";
+            const assets = JSON.parse(raw);
+            const summary = {
+              tag_name: process.env.TAG_NAME,
+              step_outcome: process.env.RELEASE_OUTCOME,
+              asset_count: Array.isArray(assets) ? assets.length : null,
+              assets,
+            };
+
+            core.summary
+              .addHeading("Assets output on Windows summary")
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+
+            if (!Array.isArray(assets) || assets.length === 0) {
+              core.setFailed("assets output was empty on Windows");
+            }
+
+      - name: Cleanup release and tag
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            try {
+              const { data: release } = await github.rest.repos.getReleaseByTag({
+                owner,
+                repo,
+                tag: process.env.TAG_NAME,
+              });
+              await github.rest.repos.deleteRelease({
+                owner,
+                repo,
+                release_id: release.id,
+              });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
+            try {
+              await github.request("DELETE /repos/{owner}/{repo}/git/refs/{ref}", {
+                owner,
+                repo,
+                ref: `tags/${process.env.TAG_NAME}`,
+              });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }

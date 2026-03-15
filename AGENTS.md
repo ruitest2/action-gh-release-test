@@ -35,11 +35,21 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Use `.github/workflows/repro-preserve-order.yml` only to confirm docs/usage behavior for `preserve_order` (`#645`).
   Do not keep `#645` in the active bug-fix bucket unless the workflow shows an action-level ordering defect rather than GitHub's own release-asset ordering.
 - Use `.github/workflows/repro-append-body.yml` for existing-release update and `append_body` behavior (`#613`, `#216`, `#238`).
+- Use `.github/workflows/repro-assets-output-windows.yml` for Windows `outputs.assets` checks (`#222`).
 - Use `.github/workflows/repro-brace-glob.yml` for brace/comma glob parsing (`#611`, `#204`).
+- Use `.github/workflows/repro-windows-glob.yml` for Windows backslash-heavy file glob behavior (`#280`, `#614`, `#311`).
 - Use `.github/workflows/repro-remote-repo.yml` for remote-repository release creation and asset upload (`#639`, `#308`).
   Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow targets a separate repository and cleans up the test release after inspection.
 - Use `.github/workflows/repro-token-precedence.yml` for remote-repository token precedence (`#639`).
   Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow intentionally sets `GITHUB_TOKEN` and expects the explicit `token` input to win.
+- Use `.github/workflows/repro-existing-draft.yml` for draft reuse and single-release behavior (`#163`).
+- Use `.github/workflows/repro-draft-false.yml` for `draft: false` behavior when creating prereleases outside a tag-triggered job (`#253`, `#379`).
+- Use `.github/workflows/repro-omit-name.yml` for omitted-name update behavior against an existing tagged release (`#363`).
+- Use `.github/workflows/repro-existing-release-ref-tag.yml` for `tag_name: refs/tags/...` update behavior (`#403`).
+- Use `.github/workflows/repro-home-tilde.yml` for home-directory path expansion (`#368`).
+- Use `.github/workflows/repro-body-too-long.yml` for large body handling and env-size stress around release notes (`#374`, `#471`).
+- Use `.github/workflows/repro-many-files.yml` for large asset-count behavior (`#335`).
+- Use `.github/workflows/repro-paren-asset.yml` for parentheses filename handling on Windows (`#393`).
 - Use `.github/workflows/repro-empty-token.yml` only to confirm docs/usage behavior for empty-string token handling (`#541`).
   Do not keep `#541` in the active bug-fix bucket unless the workflow shows a distinct runtime defect beyond the documented `token: ""` semantics.
 - Use `.github/workflows/repro-unicode-asset.yml` only to confirm docs/usage behavior for Unicode and special-character asset naming (`#542`, likely related to `#393`).

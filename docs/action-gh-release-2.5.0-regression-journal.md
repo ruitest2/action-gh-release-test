@@ -330,3 +330,26 @@ Broad historical closeout applied after this sweep:
 - The remaining issues from that bespoke-repro bucket were closed upstream with a standard current-code note when they still could not be reproduced or isolated on current `master` / `2.5.2`.
 - That closeout covered `#251`, `#280`, `#311`, `#363`, `#368`, `#373`, `#374`, `#379`, `#393`, `#403`, `#411`, `#414`, `#434`, `#471`, `#482`, `#499`, `#536`, `#549`, `#573`, `#587`, `#612`, `#614`, `#637`, `#110`, `#139`, `#156`, `#166`, `#191`, `#194`, `#210`, `#221`, `#227`, `#228`, `#239`, `#243`, `#308`, and `#335`.
 - Going forward, `2.5.3` should focus on confirmed current runtime fixes plus documentation clarifications for reports that turn out to be usage or platform-limit cases, rather than carrying old non-repro issues indefinitely.
+
+## Reopen-Candidate Repro Sweep
+
+The next pass should be repro-first for the historical closed set plus any still-open bug reports that look related.
+Do not reopen anything just because it was previously closed; only reopen if current upstream reproduces it again in this repo or a very small local check.
+
+Current workflow plan for that pass:
+
+- `.github/workflows/repro-assets-output.yml` and `.github/workflows/repro-assets-output-windows.yml` for `#222`
+- `.github/workflows/repro-existing-draft.yml` for `#163`
+- `.github/workflows/repro-draft-false.yml` for `#253` and `#379`
+- `.github/workflows/repro-omit-name.yml` for `#363`
+- `.github/workflows/repro-existing-release-ref-tag.yml` for `#403`
+- `.github/workflows/repro-home-tilde.yml` for `#368`
+- `.github/workflows/repro-body-too-long.yml` for `#374` and `#471`
+- `.github/workflows/repro-many-files.yml` for `#335`
+- `.github/workflows/repro-paren-asset.yml` for `#393`
+- `.github/workflows/repro-windows-glob.yml` for `#280`, `#614`, and `#311`
+
+Lower-value cases for later, unless one of the focused workflows exposes a related regression:
+
+- network and transport failures such as `#637`, `#612`, `#549`, `#536`, `#499`, `#482`, `#243`, `#239`, `#166`, and `#156`
+- repo-specific or environment-specific cases such as `#573`, `#587`, `#414`, `#434`, `#210`, and `#308`

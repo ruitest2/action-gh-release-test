@@ -1,0 +1,132 @@
+name: repro-existing-release-ref-tag
+run-name: repro-existing-release-ref-tag-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: master
+
+permissions:
+  contents: write
+
+jobs:
+  repro:
+    runs-on: ubuntu-latest
+    env:
+      TAG_NAME: v403.${{ github.run_id }}.${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Prepare asset
+        run: |
+          printf 'existing ref tag repro %s\n' "$TAG_NAME" > ref-tag.txt
+
+      - name: Seed existing release
+        id: seed
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const { data: release } = await github.rest.repos.createRelease({
+              owner,
+              repo,
+              tag_name: process.env.TAG_NAME,
+              name: process.env.TAG_NAME,
+              draft: false,
+            });
+            core.setOutput("release_id", String(release.id));
+
+      - name: Attempt update with refs/tags tag_name
+        id: release
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: refs/tags/${{ env.TAG_NAME }}
+          files: ref-tag.txt
+
+      - name: Assert existing release was reused
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          SEEDED_RELEASE_ID: ${{ steps.seed.outputs.release_id }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const matching = releases.filter((release) => release.tag_name === process.env.TAG_NAME);
+            const summary = {
+              tag_name: process.env.TAG_NAME,
+              step_outcome: process.env.RELEASE_OUTCOME,
+              release_count: matching.length,
+              release_ids: matching.map((release) => release.id),
+              asset_names: matching.flatMap((release) => release.assets.map((asset) => asset.name)),
+            };
+
+            core.summary
+              .addHeading("Existing release ref tag summary")
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+
+            if (
+              matching.length !== 1 ||
+              String(matching[0]?.id) !== process.env.SEEDED_RELEASE_ID ||
+              !matching[0]?.assets.some((asset) => asset.name === "ref-tag.txt")
+            ) {
+              core.setFailed("refs/tags tag_name did not reuse the existing release cleanly");
+            }
+
+      - name: Cleanup release and tag
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            for (const release of releases.filter((candidate) => candidate.tag_name === process.env.TAG_NAME)) {
+              await github.rest.repos.deleteRelease({
+                owner,
+                repo,
+                release_id: release.id,
+              });
+            }
+            try {
+              await github.request("DELETE /repos/{owner}/{repo}/git/refs/{ref}", {
+                owner,
+                repo,
+                ref: `tags/${process.env.TAG_NAME}`,
+              });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
