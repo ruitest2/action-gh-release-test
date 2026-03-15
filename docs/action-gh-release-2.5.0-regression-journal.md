@@ -257,6 +257,21 @@ Initial `2.5.3` bug bucket from this sweep:
 - `#541`
 - `#542`
 
+Planned fix order after the `2.5.2` sweep:
+
+1. `#639` + `#541` together in token selection/parsing
+2. `#571` seeded finalize/orphan-draft race
+3. `#645` preserve-order output and asset ordering
+4. `#542` Unicode and special-character asset naming, with `#393` checked alongside it
+
+Expected workflow for each fix:
+
+1. Implement the code change in `softprops/action-gh-release`
+2. Open a draft PR
+3. Verify the fix in this repo against the PR head
+4. Label the PR `bug`
+5. Final human check and merge only after the repro workflow passes
+
 ## Version Recommendation
 
 If the next release only contains the remaining regression fixes and related test/docs work, use `2.5.2`.
