@@ -46,9 +46,16 @@ For the currently relevant PRs:
   - repro: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23097946267`
   - control (`v2.4.2`): `https://github.com/ruitest2/action-gh-release-test/actions/runs/23097932777`
   - fix candidate (`#715` branch): `https://github.com/ruitest2/action-gh-release-test/actions/runs/23097932786`
-- `#704` / `#709` should be treated as finalize-on-shared-release regressions, not the generic same-tag creation race
-  - use `.github/workflows/repro-finalize-race.yml` for fresh validation against `v2.5.0`, current `master`, and any fix branch
-  - the older `repro-race.yml` evidence is still useful for the broader race cluster, but it conflates `#704` / `#709` with `#705`
+- `#704` / `#709` finalize-on-shared-release regression reproduced on `v2.5.0`
+  - repro: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23099365202`
+  - tag used: `v709final.23099365202.1`
+  - worker evidence: worker 1 created a new release instead of finding the seeded draft, then hit `Validation Failed: {"resource":"Release","code":"already_exists","field":"tag_name"}` during finalize and aborted with `Too many retries.`
+  - resulting release state: one published release plus four leftover draft/untagged releases for the same logical tag
+- current `master` no longer reproduces `#704` / `#709`
+  - verify: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23099365201`
+  - tag used: `v709final.23099365201.1`
+  - outcome: worker 1 found the seeded draft release, the workflow completed successfully, and the single published release contains all four uploaded assets
+  - inference: the merged direct `getReleaseByTag` lookup in PR `#725` is the most likely reason current `master` no longer misses the pre-existing draft release
 
 ### Older or separate bugs
 
@@ -56,6 +63,10 @@ For the currently relevant PRs:
   - control run (`v2.4.2`): `https://github.com/ruitest2/action-gh-release-test/actions/runs/23097960706`
   - tag used: `v709.23097960706.1`
   - outcome: duplicate releases were still created, but the 2.5.0 finalize retry failure did not appear
+  - current `master` still reproduces the broader duplicate-release race in `.github/workflows/repro-race.yml`
+  - verify: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23099281968`
+  - tag used: `v709.23099281968.1`
+  - outcome: four releases were still created for one tag, but the finalize retry failure did not appear
 - `#740` same filename uploaded by concurrent flows reproduced
   - repro: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23097970110`
   - tag used: `v740.23097970110.1`
@@ -91,16 +102,15 @@ As of 2026-03-14, the following fix PRs are merged into `softprops/action-gh-rel
 - `#715` `fix: release marked as 'latest' despite make_latest: false`
 - `#725` `fix: use getReleaseByTag API instead of iterating all releases`
 
-That leaves the race cluster as the primary remaining blocker for `2.5.1`, with `#704` / `#709` needing dedicated finalize-race validation and `#705` still confirmed independently.
+The dedicated `#704` / `#709` finalize-race regression is no longer reproducible on current `master`.
+The remaining confirmed race bug is the older shared-tag duplicate-release path in `#705` (and likely `#740`).
 
 ## Next Execution Order
 
-1. Re-run `.github/workflows/repro-race.yml` and `.github/workflows/repro-finalize-race.yml` against current `softprops/action-gh-release/master`
-2. Confirm which parts of the race cluster still reproduce on current `master`
-3. Build the fix in `softprops/action-gh-release` on a new PR branch
-4. Re-run the relevant race workflows against that fix branch
-5. Label the fix PR `bug`
-6. Cut `2.5.1` only after the remaining race repro is fixed or intentionally deferred
+1. Treat `#704` / `#709` as already covered by the merged fixes now on `softprops/action-gh-release/master`
+2. If shipping `2.5.1` immediately, cut it from current `master` using the evidence in this journal
+3. If doing one more bug-fix round first, target `#705` and re-run `.github/workflows/repro-race.yml` plus `.github/workflows/repro-duplicate-asset.yml`
+4. Label any new bug-fix PR `bug`
 
 ## Version Recommendation
 
