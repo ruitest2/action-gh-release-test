@@ -134,16 +134,31 @@ Fresh `v2.5.1` baselines for the next bug-fix round:
 
 Recommended scope for `2.5.2`:
 
-1. Fix `#705` first and expect that it may also improve `#740`
-2. Attempt `#708` only if the harness has `ACTION_GH_RELEASE_TRIGGER_TOKEN` configured; otherwise record it as still blocked in this repo
-3. Keep `#741` and `#742` as follow-up work unless they naturally fit after the race fix
+1. Merge PR `#746` for `#705`
+2. Revisit `#740`; it is related to same-tag concurrency, but it is still a separate asset upload race
+3. Attempt `#708` only if the harness has `ACTION_GH_RELEASE_TRIGGER_TOKEN` configured; otherwise record it as still blocked in this repo
+4. Keep `#741` and `#742` as follow-up work unless they naturally fit after the race fixes
+
+## Active Fix Candidates
+
+- PR `#746` `fix: canonicalize releases after concurrent create`
+  - branch under test: `chenrui333/action-gh-release@codex/fix-705-canonicalize-created-release`
+  - verify: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23099930957`
+  - tag used: `v709.23099930957.1`
+  - outcome: exactly one published release remained for the tag and it contains all four assets:
+    - `asset-1.txt`
+    - `asset-2.txt`
+    - `asset-3.txt`
+    - `asset-4.txt`
+  - release id: `297093126`
+  - interpretation: this branch fixes the confirmed `#705` shared-tag duplicate-release path in the consumer harness
 
 ## Next Execution Order
 
-1. Build the next upstream bug-fix PR from current `softprops/action-gh-release/master`, starting with `#705`
-2. Re-run `.github/workflows/repro-race.yml` and, if relevant, `.github/workflows/repro-duplicate-asset.yml` against the fix branch
-3. Label any new race-fix PR `bug`
-4. Only attempt `.github/workflows/trigger-prerelease.yml` for `#708` after `ACTION_GH_RELEASE_TRIGGER_TOKEN` exists in this repo
+1. Keep PR `#746` as the current `#705` fix candidate and re-run `.github/workflows/repro-race.yml` if the branch changes
+2. Evaluate the next same-tag bug after `#705`, starting with `#740`
+3. Only attempt `.github/workflows/trigger-prerelease.yml` for `#708` after `ACTION_GH_RELEASE_TRIGGER_TOKEN` exists in this repo
+4. Keep labeling any new bug-fix PR `bug`
 
 ## Version Recommendation
 
