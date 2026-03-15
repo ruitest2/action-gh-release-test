@@ -120,6 +120,18 @@ The remaining open bug cluster for the next release is:
 - `#741` dotfile asset name regression
 - `#742` Node 24 runtime migration
 
+Fresh `v2.5.1` baselines for the next bug-fix round:
+
+- `#705` still reproduces on `v2.5.1`
+  - repro: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23099732390`
+  - tag used: `v709.23099732390.1`
+  - outcome: four releases were still created for one tag
+  - worker evidence: one worker still hit `Validation Failed: {"resource":"Release","code":"already_exists","field":"tag_name"}` during finalize, retried down to zero, and aborted with `Too many retries.`
+- `#708` is still blocked in this harness on `v2.5.1`
+  - attempt: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23099732384`
+  - outcome: `.github/workflows/trigger-prerelease.yml` failed early because `ACTION_GH_RELEASE_TRIGGER_TOKEN` is not configured in this repo
+  - implication: do not treat `#708` as reproducible or fixed from this harness until that secret exists
+
 Recommended scope for `2.5.2`:
 
 1. Fix `#705` first and expect that it may also improve `#740`
@@ -128,14 +140,13 @@ Recommended scope for `2.5.2`:
 
 ## Next Execution Order
 
-1. Re-run `.github/workflows/repro-race.yml` against current `softprops/action-gh-release/master` or `v2.5.1` to keep a fresh baseline for `#705`
-2. Attempt `.github/workflows/trigger-prerelease.yml` for `#708`; if the trigger token is still missing, record that the issue remains blocked in this harness
-3. Build the next upstream bug-fix PR from current `master`, starting with `#705`
-4. Re-run the relevant regression workflows against the fix branch
-5. Label any new bug-fix PR `bug`
+1. Build the next upstream bug-fix PR from current `softprops/action-gh-release/master`, starting with `#705`
+2. Re-run `.github/workflows/repro-race.yml` and, if relevant, `.github/workflows/repro-duplicate-asset.yml` against the fix branch
+3. Label any new race-fix PR `bug`
+4. Only attempt `.github/workflows/trigger-prerelease.yml` for `#708` after `ACTION_GH_RELEASE_TRIGGER_TOKEN` exists in this repo
 
 ## Version Recommendation
 
-If the next release only contains the regression fixes and related test/docs work, use `2.5.1`.
+If the next release only contains the remaining regression fixes and related test/docs work, use `2.5.2`.
 
-Use `2.6.0` only if the release intentionally includes new feature work such as `#732` or other additive behavior beyond the 2.5.0 bug-fix batch.
+Use `2.6.0` only if the release intentionally includes new feature work such as `#732` or other additive behavior beyond the current bug-fix batch.
