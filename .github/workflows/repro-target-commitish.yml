@@ -1,5 +1,5 @@
-name: repro-paren-asset
-run-name: repro-paren-asset-${{ inputs.action_ref }}
+name: repro-target-commitish
+run-name: repro-target-commitish-${{ inputs.action_ref }}
 
 on:
   workflow_dispatch:
@@ -18,12 +18,13 @@ permissions:
 
 jobs:
   repro:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     env:
-      TAG_NAME: v393.${{ github.run_id }}.${{ github.run_attempt }}
-      ASSET_NAME: appName(x64)_1.0.0.${{ github.run_attempt }}.msi
+      TAG_NAME: v411.${{ github.run_id }}.${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/checkout@v4
         with:
@@ -31,59 +32,70 @@ jobs:
           ref: ${{ inputs.action_ref }}
           path: action-under-test
 
-      - name: Prepare paren asset
-        shell: pwsh
+      - name: Resolve previous commit
+        id: previous
         run: |
-          Set-Content -Path $env:ASSET_NAME -Value "paren repro $env:TAG_NAME"
+          echo "sha=$(git rev-parse HEAD^)" >> "$GITHUB_OUTPUT"
 
-      - name: Attempt release
+      - name: Prepare asset
+        run: |
+          printf 'target commitish repro %s\n' "$TAG_NAME" > target-commitish.txt
+
+      - name: Attempt release with non-latest commitish
         id: release
         continue-on-error: true
         uses: ./action-under-test
         with:
           tag_name: ${{ env.TAG_NAME }}
-          files: ${{ env.ASSET_NAME }}
+          target_commitish: ${{ steps.previous.outputs.sha }}
+          files: target-commitish.txt
 
-      - name: Assert filename stayed intact
+      - name: Assert release honored previous commitish
         if: always()
         uses: actions/github-script@v7
         env:
           TAG_NAME: ${{ env.TAG_NAME }}
-          ASSET_NAME: ${{ env.ASSET_NAME }}
+          TARGET_COMMITISH: ${{ steps.previous.outputs.sha }}
           RELEASE_OUTCOME: ${{ steps.release.outcome }}
         with:
           github-token: ${{ github.token }}
           script: |
             const { owner, repo } = context.repo;
-            const { data: release } = await github.rest.repos.getReleaseByTag({
-              owner,
-              repo,
-              tag: process.env.TAG_NAME,
-            });
-            const assetSummaries = release.assets.map((asset) => ({
-              id: asset.id,
-              name: asset.name,
-              label: asset.label,
-            }));
+            let release = null;
+            try {
+              const response = await github.rest.repos.getReleaseByTag({
+                owner,
+                repo,
+                tag: process.env.TAG_NAME,
+              });
+              release = response.data;
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
+
             const summary = {
               tag_name: process.env.TAG_NAME,
+              target_commitish: process.env.TARGET_COMMITISH,
               step_outcome: process.env.RELEASE_OUTCOME,
-              assets: assetSummaries,
+              release_id: release?.id ?? null,
+              release_target_commitish: release?.target_commitish ?? null,
+              asset_names: release?.assets.map((asset) => asset.name) ?? [],
             };
 
             core.summary
-              .addHeading("Paren asset summary")
+              .addHeading("Target commitish summary")
               .addCodeBlock(JSON.stringify(summary, null, 2), "json")
               .write();
 
-            const matchingAsset = release.assets.find((asset) => asset.label === process.env.ASSET_NAME);
-            if (!matchingAsset) {
-              core.setFailed("asset label with parentheses was not restored");
-              return;
-            }
-
-            if (matchingAsset.name !== process.env.ASSET_NAME) {
-              core.setFailed("asset download name with parentheses was normalized or changed");
+            if (
+              process.env.RELEASE_OUTCOME !== "success" ||
+              !release ||
+              release.target_commitish !== process.env.TARGET_COMMITISH ||
+              !release.assets.some((asset) => asset.name === "target-commitish.txt")
+            ) {
+              core.setFailed("non-latest target_commitish did not create the release cleanly");
             }
 
       - name: Cleanup release and tag

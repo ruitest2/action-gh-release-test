@@ -329,7 +329,8 @@ Broad historical closeout applied after this sweep:
 
 - The remaining issues from that bespoke-repro bucket were closed upstream with a standard current-code note when they still could not be reproduced or isolated on current `master` / `2.5.2`.
 - That closeout covered `#251`, `#280`, `#311`, `#363`, `#368`, `#373`, `#374`, `#379`, `#393`, `#403`, `#411`, `#414`, `#434`, `#471`, `#482`, `#499`, `#536`, `#549`, `#573`, `#587`, `#612`, `#614`, `#637`, `#110`, `#139`, `#156`, `#166`, `#191`, `#194`, `#210`, `#221`, `#227`, `#228`, `#239`, `#243`, `#308`, and `#335`.
-- Going forward, `2.5.3` should focus on confirmed current runtime fixes plus documentation clarifications for reports that turn out to be usage or platform-limit cases, rather than carrying old non-repro issues indefinitely.
+- Do not reuse that broad closeout pattern going forward.
+  Future sweeps should stay repro-first and preserve fresh run evidence before deciding whether a historical issue should remain closed, move to docs/platform guidance, or become a reopen candidate.
 
 ## Reopen-Candidate Repro Sweep
 
@@ -347,9 +348,16 @@ Current workflow plan for that pass:
 - `.github/workflows/repro-body-too-long.yml` for `#374` and `#471`
 - `.github/workflows/repro-many-files.yml` for `#335`
 - `.github/workflows/repro-paren-asset.yml` for `#393`
+- `.github/workflows/repro-target-commitish.yml` for `#411`
+- `.github/workflows/repro-dm-asset.yml` for `#434`
 - `.github/workflows/repro-windows-glob.yml` for `#280`, `#614`, and `#311`
 
 Lower-value cases for later, unless one of the focused workflows exposes a related regression:
 
 - network and transport failures such as `#637`, `#612`, `#549`, `#536`, `#499`, `#482`, `#243`, `#239`, `#166`, and `#156`
-- repo-specific or environment-specific cases such as `#573`, `#587`, `#414`, `#434`, `#210`, and `#308`
+- repo-specific or environment-specific cases such as `#573`, `#587`, `#414`, `#210`, and `#308`
+
+Current repro-first note:
+
+- Do not reopen or re-close historical issues based only on past comments.
+- Capture a fresh current run first, then decide whether the issue belongs in the active bug bucket, the docs/platform bucket, or the non-repro bucket.

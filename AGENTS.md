@@ -50,14 +50,18 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Use `.github/workflows/repro-body-too-long.yml` for large body handling and env-size stress around release notes (`#374`, `#471`).
 - Use `.github/workflows/repro-many-files.yml` for large asset-count behavior (`#335`).
 - Use `.github/workflows/repro-paren-asset.yml` for parentheses filename handling on Windows (`#393`).
+- Use `.github/workflows/repro-target-commitish.yml` for non-latest `target_commitish` release creation (`#411`).
+- Use `.github/workflows/repro-dm-asset.yml` for DexMetadata-style `.dm` asset uploads (`#434`).
 - Use `.github/workflows/repro-empty-token.yml` only to confirm docs/usage behavior for empty-string token handling (`#541`).
   Do not keep `#541` in the active bug-fix bucket unless the workflow shows a distinct runtime defect beyond the documented `token: ""` semantics.
 - Use `.github/workflows/repro-unicode-asset.yml` only to confirm docs/usage behavior for Unicode and special-character asset naming (`#542`, likely related to `#393`).
   Do not keep `#542` in the active bug-fix bucket unless the workflow shows an action-level defect beyond GitHub's own filename normalization and label limits.
-- When doing historical bug sweeps, separate issues into three buckets in the journal: confirmed non-repro on current upstream, confirmed docs/usage or platform limitations, and still-open cases that need a bespoke repro.
+- When doing historical bug sweeps, stay repro-first.
+  Record concrete current evidence in the journal before suggesting a closeout, a docs reclassification, or a reopen candidate.
+- Separate historical issues into three buckets in the journal: confirmed non-repro on current upstream, confirmed docs/usage or platform limitations, and still-reproducible current defects.
   Only keep the third bucket as active runtime bugs.
-- If a historical issue cannot be reproduced or isolated on current upstream after a reasonable sweep, close it upstream with a short stale/non-repro note instead of carrying it forward as an active bug.
-  Reserve the active release bucket for confirmed current defects and any docs clarifications that current testing still justifies.
+- Do not treat an old close comment as proof that a case is resolved.
+  If a closed issue still reproduces on current upstream, capture the current run evidence first and then let the upstream repo decide whether it is worth reopening.
 
 ## Done Criteria
 

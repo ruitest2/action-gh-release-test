@@ -130,7 +130,10 @@ jobs:
                 ref: `tags/${process.env.TAG_NAME}`,
               });
             } catch (error) {
-              if (error.status !== 404) {
+              if (
+                error.status !== 404 &&
+                !(error.status === 422 && /Reference does not exist/i.test(error.message))
+              ) {
                 throw error;
               }
             }
