@@ -12,6 +12,14 @@ on:
         description: Action ref to test
         required: true
         default: master
+      expected_release_outcome:
+        description: Whether the release step should succeed or fail
+        required: true
+        type: choice
+        options:
+          - success
+          - failure
+        default: success
 
 permissions:
   contents: write
@@ -46,16 +54,19 @@ jobs:
           target_commitish: ${{ github.sha }}
           files: draft-false.txt
 
-      - name: Assert release was published with the uploaded asset
+      - name: Assert prerelease outcome
         if: always()
         uses: actions/github-script@v7
         env:
           TAG_NAME: ${{ env.TAG_NAME }}
           RELEASE_OUTCOME: ${{ steps.release.outcome }}
+          EXPECTED_RELEASE_OUTCOME: ${{ inputs.expected_release_outcome }}
         with:
           github-token: ${{ github.token }}
           script: |
             const { owner, repo } = context.repo;
+            const stepOutcome = process.env.RELEASE_OUTCOME;
+            const expectedOutcome = process.env.EXPECTED_RELEASE_OUTCOME;
             const { data: release } = await github.rest.repos.getReleaseByTag({
               owner,
               repo,
@@ -63,7 +74,8 @@ jobs:
             });
             const summary = {
               tag_name: process.env.TAG_NAME,
-              step_outcome: process.env.RELEASE_OUTCOME,
+              expected_outcome: expectedOutcome,
+              step_outcome: stepOutcome,
               draft: release.draft,
               prerelease: release.prerelease,
               asset_names: release.assets.map((asset) => asset.name),
@@ -74,15 +86,24 @@ jobs:
               .addCodeBlock(JSON.stringify(summary, null, 2), "json")
               .write();
 
-            if (
-              stepOutcome !== "success" ||
-              release.draft ||
-              !release.prerelease ||
-              !release.assets.some((asset) => asset.name === "draft-false.txt")
-            ) {
-              core.setFailed(
-                "release did not finish as a published prerelease with the uploaded asset",
-              );
+            if (stepOutcome !== expectedOutcome) {
+              core.setFailed(`expected release step outcome ${expectedOutcome}, got ${stepOutcome}`);
+              return;
+            }
+
+            if (release.draft || !release.prerelease) {
+              core.setFailed("release did not stay published as a prerelease");
+              return;
+            }
+
+            const hasAsset = release.assets.some((asset) => asset.name === "draft-false.txt");
+            if (expectedOutcome === "success" && !hasAsset) {
+              core.setFailed("expected uploaded asset to be present on the published prerelease");
+              return;
+            }
+
+            if (expectedOutcome === "failure" && hasAsset) {
+              core.setFailed("expected immutable prerelease failure to leave the asset absent");
             }
 
       - name: Cleanup release and tag

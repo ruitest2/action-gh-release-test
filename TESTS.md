@@ -1,0 +1,30 @@
+# action-gh-release-test Scenario Matrix
+
+This repository is the external regression harness for `softprops/action-gh-release`.
+Use this file as the contract-level map of major user-facing behaviors to the workflows
+that verify them.
+
+## How To Use This Matrix
+
+- Run workflows from `main` and pass the exact upstream `action_repository` and `action_ref` under test.
+- Prefer the smallest workflow that directly proves the behavior you changed.
+- Update this file when a user-facing behavior gets a new regression workflow or when an existing workflow's responsibility changes.
+- Keep issue-level workflow notes in `AGENTS.md`; keep the major scenario inventory here.
+
+## Major User-Facing Scenarios
+
+| Scenario | Primary workflow(s) | Notes |
+| --- | --- | --- |
+| Basic tag-triggered release creation and asset upload | [.github/workflows/e2e.yml](.github/workflows/e2e.yml) | Simple smoke for the default release path. Pin the upstream ref in the workflow before running a targeted verification. |
+| Existing release update by tag | [.github/workflows/repro-append-body.yml](.github/workflows/repro-append-body.yml), [.github/workflows/repro-omit-name.yml](.github/workflows/repro-omit-name.yml), [.github/workflows/repro-existing-release-ref-tag.yml](.github/workflows/repro-existing-release-ref-tag.yml) | Covers update-in-place behavior, omitted fields, and `tag_name: refs/tags/...` normalization. |
+| Existing draft reuse and finalization | [.github/workflows/repro-existing-draft.yml](.github/workflows/repro-existing-draft.yml) | Run with `draft_mode: keep` to keep the seeded draft and `draft_mode: publish` to publish it after upload. |
+| Prerelease publishing and release-event behavior | [.github/workflows/trigger-prerelease.yml](.github/workflows/trigger-prerelease.yml), [.github/workflows/observe-prereleased.yml](.github/workflows/observe-prereleased.yml), [.github/workflows/observe-published.yml](.github/workflows/observe-published.yml) | Requires the `ACTION_GH_RELEASE_TRIGGER_TOKEN` secret so GitHub will fire downstream release-event workflows. |
+| New prerelease with `draft: false` and asset upload | [.github/workflows/repro-draft-false.yml](.github/workflows/repro-draft-false.yml) | Primary regression for prerelease creation outside tag-triggered jobs. Use the default `expected_release_outcome: success` on mutable repos. |
+| Immutable release compatibility | [.github/workflows/repro-draft-false.yml](.github/workflows/repro-draft-false.yml), [.github/workflows/repro-existing-draft.yml](.github/workflows/repro-existing-draft.yml), [.github/workflows/trigger-prerelease.yml](.github/workflows/trigger-prerelease.yml) | Use `gh api -H 'X-GitHub-Api-Version: 2022-11-28' -X PUT repos/ruitest2/action-gh-release-test/immutable-releases` before immutable runs and the matching `-X DELETE` call afterward if you need mutable-only checks. Run `repro-draft-false.yml` with `expected_release_outcome: failure` to capture the immutable prerelease limitation and `repro-existing-draft.yml` with `draft_mode: publish` to confirm seeded draft publication still works. |
+| Concurrent same-tag creation and finalization races | [.github/workflows/repro-race.yml](.github/workflows/repro-race.yml), [.github/workflows/repro-finalize-race.yml](.github/workflows/repro-finalize-race.yml) | Covers duplicate-release races, draft-finalization races, and related cleanup behavior. |
+| Duplicate asset upload, overwrite, and renamed-asset handling | [.github/workflows/repro-duplicate-asset.yml](.github/workflows/repro-duplicate-asset.yml) | Reuse `asset_name` and `expected_display_name` inputs for both plain filenames and GitHub-renamed assets such as `.config`. |
+| Asset outputs contract | [.github/workflows/repro-assets-output.yml](.github/workflows/repro-assets-output.yml), [.github/workflows/repro-assets-output-windows.yml](.github/workflows/repro-assets-output-windows.yml) | Verifies `outputs.assets` and tagged asset URLs on Linux and Windows. |
+| Remote repository targeting and token selection | [.github/workflows/repro-remote-repo.yml](.github/workflows/repro-remote-repo.yml), [.github/workflows/repro-token-precedence.yml](.github/workflows/repro-token-precedence.yml), [.github/workflows/repro-empty-token.yml](.github/workflows/repro-empty-token.yml) | Covers alternate repository selection and explicit-token precedence. The remote-repo workflows require `ACTION_GH_RELEASE_TRIGGER_TOKEN`. |
+| File glob, path, and working-directory style path resolution | [.github/workflows/repro-brace-glob.yml](.github/workflows/repro-brace-glob.yml), [.github/workflows/repro-windows-glob.yml](.github/workflows/repro-windows-glob.yml), [.github/workflows/repro-home-tilde.yml](.github/workflows/repro-home-tilde.yml), [.github/workflows/repro-windows.yml](.github/workflows/repro-windows.yml) | Use these for pattern parsing, Windows separators, home-directory expansion, and cross-platform path behavior. |
+| Release metadata options | [.github/workflows/repro-make-latest.yml](.github/workflows/repro-make-latest.yml), [.github/workflows/repro-target-commitish.yml](.github/workflows/repro-target-commitish.yml), [.github/workflows/repro-previous-tag-release-notes.yml](.github/workflows/repro-previous-tag-release-notes.yml), [.github/workflows/repro-body-too-long.yml](.github/workflows/repro-body-too-long.yml) | Covers `make_latest`, `target_commitish`, explicit release-note ranges, and large release bodies. |
+| Unusual asset sets and naming edge cases | [.github/workflows/repro-many-files.yml](.github/workflows/repro-many-files.yml), [.github/workflows/repro-dm-asset.yml](.github/workflows/repro-dm-asset.yml), [.github/workflows/repro-paren-asset.yml](.github/workflows/repro-paren-asset.yml), [.github/workflows/repro-dotfile.yml](.github/workflows/repro-dotfile.yml), [.github/workflows/repro-unicode-asset.yml](.github/workflows/repro-unicode-asset.yml) | Use these when the change could affect unusual asset counts, dotfiles, special characters, or filename normalization. |

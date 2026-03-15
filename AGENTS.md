@@ -6,6 +6,7 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 ## Guardrails
 
 - Keep the workflow intentionally small and focused on end-to-end release behavior.
+- Keep [TESTS.md](TESTS.md) current as the major user-facing regression matrix. Update it whenever a new workflow becomes the primary verifier for a feature surface or release path.
 - When testing a specific upstream PR or commit, pin `.github/workflows/e2e.yml` to the exact `softprops/action-gh-release` ref under test instead of relying on `master`.
 - Prefer disposable branches and unique tags for each regression run so the resulting workflow runs and releases are easy to trace.
 - Keep `test-assets/` stable unless a regression case explicitly requires different fixtures.
@@ -46,7 +47,7 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Use `.github/workflows/repro-existing-draft.yml` for existing-draft reuse and draft-state behavior (`#163`, PR `#245`).
   Pass `draft_mode: keep` to verify the release stays draft, or `draft_mode: publish` to verify the seeded draft is reused and then published when `draft` is omitted.
 - Use `.github/workflows/repro-draft-false.yml` for `draft: false` behavior when creating prereleases outside a tag-triggered job (`#253`, `#379`).
-  For immutable-release verification (`#641`), enable immutable releases on this repo before dispatching `repro-draft-false.yml` and `repro-existing-draft.yml`, then disable them again if you need mutable-only checks. The local maintainer toggle is `gh api -H 'X-GitHub-Api-Version: 2022-11-28' -X PUT repos/ruitest2/action-gh-release-test/immutable-releases` to enable and the matching `-X DELETE` call to disable.
+  For immutable-release verification (`#641`), enable immutable releases on this repo, run `repro-draft-false.yml` with `expected_release_outcome: failure`, and pair it with `repro-existing-draft.yml` in `draft_mode: publish` to confirm the failure is limited to brand-new prereleases. The local maintainer toggle is `gh api -H 'X-GitHub-Api-Version: 2022-11-28' -X PUT repos/ruitest2/action-gh-release-test/immutable-releases` to enable and the matching `-X DELETE` call to disable.
 - Use `.github/workflows/repro-omit-name.yml` for omitted-name update behavior against an existing tagged release (`#363`).
 - Use `.github/workflows/repro-existing-release-ref-tag.yml` for `tag_name: refs/tags/...` update behavior (`#403`).
 - Use `.github/workflows/repro-home-tilde.yml` for home-directory path expansion (`#368`).
