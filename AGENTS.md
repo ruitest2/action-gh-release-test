@@ -42,7 +42,8 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
   Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow targets a separate repository and cleans up the test release after inspection.
 - Use `.github/workflows/repro-token-precedence.yml` for remote-repository token precedence (`#639`).
   Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow intentionally sets `GITHUB_TOKEN` and expects the explicit `token` input to win.
-- Use `.github/workflows/repro-existing-draft.yml` for draft reuse and single-release behavior (`#163`).
+- Use `.github/workflows/repro-existing-draft.yml` for existing-draft reuse and draft-state behavior (`#163`, PR `#245`).
+  Pass `draft_mode: keep` to verify the release stays draft, or `draft_mode: publish` to verify the seeded draft is reused and then published when `draft` is omitted.
 - Use `.github/workflows/repro-draft-false.yml` for `draft: false` behavior when creating prereleases outside a tag-triggered job (`#253`, `#379`).
 - Use `.github/workflows/repro-omit-name.yml` for omitted-name update behavior against an existing tagged release (`#363`).
 - Use `.github/workflows/repro-existing-release-ref-tag.yml` for `tag_name: refs/tags/...` update behavior (`#403`).

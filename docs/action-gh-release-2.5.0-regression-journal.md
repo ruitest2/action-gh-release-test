@@ -472,3 +472,17 @@ Progress update:
 - Smoke verification stayed green on the same PR head:
   `.github/workflows/repro-assets-output.yml` passed on `23103914094`, and `.github/workflows/repro-race.yml` passed on `23103914102`.
 - Current result: PR `#372` is ready for final human review as the first `2.6.0` feature candidate.
+
+Next target:
+
+- PR `#245` (`feat: allow updating draft releases`) needs a fresh current-behavior check before any upstream rebase.
+- Its 2022 behavior claim overlaps with current `master`, so do not carry the old implementation forward blindly.
+
+Plan:
+
+1. Expand `.github/workflows/repro-existing-draft.yml` into a two-mode verifier.
+   Use `draft_mode: keep` to confirm the action reuses an existing draft and keeps it draft when `draft: true` is still set.
+2. Re-run the same harness with `draft_mode: publish`.
+   That variant should confirm whether current `master` already reuses the seeded draft and publishes it after upload when `draft` is omitted.
+3. Only rebase and rework PR `#245` if one of those current-behavior checks fails.
+   If both pass on current `master`, treat the PR as obsolete and avoid reviving stale draft-release logic.

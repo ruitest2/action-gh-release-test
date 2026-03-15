@@ -1,5 +1,5 @@
 name: repro-existing-draft
-run-name: repro-existing-draft-${{ inputs.action_ref }}
+run-name: repro-existing-draft-${{ inputs.action_ref }}-${{ inputs.draft_mode }}
 
 on:
   workflow_dispatch:
@@ -12,6 +12,10 @@ on:
         description: Action ref to test
         required: true
         default: master
+      draft_mode:
+        description: Whether the action should keep the seeded draft or publish it after reuse
+        required: true
+        default: keep
 
 permissions:
   contents: write
@@ -53,8 +57,9 @@ jobs:
             });
             core.setOutput("release_id", String(release.id));
 
-      - name: Attempt draft reuse
-        id: release
+      - name: Attempt draft reuse and keep draft
+        id: release_keep
+        if: inputs.draft_mode == 'keep'
         continue-on-error: true
         uses: ./action-under-test
         with:
@@ -62,13 +67,24 @@ jobs:
           draft: true
           files: draft-asset.txt
 
-      - name: Assert single draft was reused
+      - name: Attempt draft reuse and publish
+        id: release_publish
+        if: inputs.draft_mode == 'publish'
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          files: draft-asset.txt
+
+      - name: Assert seeded draft behavior
         if: always()
         uses: actions/github-script@v7
         env:
+          DRAFT_MODE: ${{ inputs.draft_mode }}
           SEEDED_RELEASE_ID: ${{ steps.seed.outputs.release_id }}
           TAG_NAME: ${{ env.TAG_NAME }}
-          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+          KEEP_OUTCOME: ${{ steps.release_keep.outcome }}
+          PUBLISH_OUTCOME: ${{ steps.release_publish.outcome }}
         with:
           github-token: ${{ github.token }}
           script: |
@@ -79,9 +95,15 @@ jobs:
               per_page: 100,
             });
             const matching = releases.filter((release) => release.tag_name === process.env.TAG_NAME);
+            const draftMode = process.env.DRAFT_MODE;
+            const expectedDraft = draftMode === "keep";
+            const stepOutcome =
+              draftMode === "publish" ? process.env.PUBLISH_OUTCOME : process.env.KEEP_OUTCOME;
             const summary = {
               tag_name: process.env.TAG_NAME,
-              step_outcome: process.env.RELEASE_OUTCOME,
+              draft_mode: draftMode,
+              expected_draft: expectedDraft,
+              step_outcome: stepOutcome,
               release_count: matching.length,
               release_ids: matching.map((release) => release.id),
               draft_flags: matching.map((release) => release.draft),
@@ -96,10 +118,10 @@ jobs:
             if (
               matching.length !== 1 ||
               String(matching[0]?.id) !== process.env.SEEDED_RELEASE_ID ||
-              !matching[0]?.draft ||
+              matching[0]?.draft !== expectedDraft ||
               !matching[0]?.assets.some((asset) => asset.name === "draft-asset.txt")
             ) {
-              core.setFailed("existing draft release was not reused cleanly");
+              core.setFailed("existing draft release was not reused with the expected draft state");
             }
 
       - name: Cleanup releases and tag
