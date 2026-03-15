@@ -223,11 +223,35 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
 - GitHub-platform note validated during docs review:
   GitHub's `defaults.run.working-directory` setting applies to `run` steps, so this action's own `working_directory` input remains the correct way to resolve release asset globs under a subdirectory for a `uses:` step.
 
+### 2026-03-15: `dist/index.js` freshness guard
+
+- Upstream branch under test:
+  `ci-dist-freshness-guard`
+- Current upstream ref:
+  `728647f07c33da14988fa8e654174bf41c7f64d5`
+- Upstream merge state:
+  merged to `softprops/action-gh-release` `master` as `#762` / `8a8510e`
+- Current upstream outcome:
+  narrow CI-only maintainer-safety check in `.github/workflows/main.yml`
+- What the upstream change covers:
+  - run `git diff --exit-code --stat -- dist/index.js` after `npm run build`
+  - fail CI with a direct maintainer-facing message when the checked-in bundle drifts from the built output
+  - keep the guard scoped to `dist/index.js` instead of reviving a generic working-tree cleanliness check
+- Verification performed:
+  - `npm run fmtcheck`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm test`
+  - `git diff --exit-code --stat -- dist/index.js`
+- External regression coverage:
+  not run for this item because the branch is CI-only and does not change runtime behavior
+
 ## Current Status
 
 - Journal created on 2026-03-15.
 - The renamed-asset concurrent-upload fix is merged on upstream `master`.
 - The `working_directory` docs sync is merged on upstream `master`.
+- The `dist/index.js` freshness guard is merged on upstream `master`.
 - Next active `2.6.0` item:
-  add or refresh the `dist/index.js` freshness guard in CI.
-- `dist/index.js` freshness guard and immutable-release verification remain open `2.6.0` research or implementation candidates.
+  verify immutable-release compatibility and only code if current `master` still publishes too early.
+- Immutable-release verification remains the last open `2.6.0` research or implementation candidate from this journal.
