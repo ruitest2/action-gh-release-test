@@ -386,3 +386,24 @@ Current reopen-candidate list from this pass:
 - `#280`
 - `#614`
 - `#311`
+
+Planned fix split from this pass:
+
+1. Windows path normalization and glob compatibility in one PR for `#280`, `#614`, and `#311`.
+   Use `.github/workflows/repro-windows-glob.yml` as the primary verifier, and keep an eye on `#368` because the same normalization work may partially overlap.
+2. Home-directory path expansion in one PR for `#368`.
+   Use `.github/workflows/repro-home-tilde.yml` as the verifier.
+3. `refs/tags/...` tag-name normalization and existing-release reuse in one PR for `#403`.
+   Use `.github/workflows/repro-existing-release-ref-tag.yml` as the verifier.
+4. Parentheses filename preservation in one PR for `#393`.
+   Use `.github/workflows/repro-paren-asset.yml` as the verifier, and check both the raw asset name and the restored label.
+5. Non-latest `target_commitish` handling in one PR for `#411`.
+   Use `.github/workflows/repro-target-commitish.yml` as the verifier.
+
+Execution order:
+
+1. `#280` / `#614` / `#311`
+2. `#368`
+3. `#403`
+4. `#393`
+5. `#411`
