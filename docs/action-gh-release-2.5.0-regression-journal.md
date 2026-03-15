@@ -450,6 +450,7 @@ Current reopen guidance from this pass:
 Current target:
 
 - PR `#372` (`feat: generate release notes from latest tag`) is the first `2.6.0` feature candidate worth reviving.
+- The actual user-facing scope is issue `#257`: add an optional `previous_tag` input so GitHub-generated release notes can use an explicit comparison base.
 
 Plan:
 
@@ -459,3 +460,15 @@ Plan:
    The harness seeds two prior releases and only passes if the action-generated release body matches GitHub's `generateReleaseNotes` output for the explicitly requested older `previous_tag`, not the most recent release.
 4. Re-run a small smoke set after the feature verifier to make sure no major existing flows were regressed.
    Start with `.github/workflows/repro-assets-output.yml` and `.github/workflows/repro-race.yml`, then add another focused harness if the rebase touches adjacent logic.
+
+Progress update:
+
+- PR `#372` was rebased onto upstream `master` and force-pushed back to the existing contributor branch as head `bbcf90210effd3d2b4f77046211ae5227d7ee4db`.
+- The rebased implementation keeps current `master` release creation/update/finalization flow intact and threads the optional `previous_tag` input into GitHub's `generateReleaseNotes` API as `previous_tag_name`.
+- `action.yml` and `README.md` now describe `previous_tag` as an optional override that only affects `generate_release_notes`.
+- Upstream PR build is green on `23103901013`.
+- The dedicated feature verifier `.github/workflows/repro-previous-tag-release-notes.yml` passed on `23103910083`.
+- That run seeded both a "latest" and an older "previous" release, then confirmed the action-generated release body matched GitHub's expected body for the explicitly requested `previous_tag` instead of the latest seeded release.
+- Smoke verification stayed green on the same PR head:
+  `.github/workflows/repro-assets-output.yml` passed on `23103914094`, and `.github/workflows/repro-race.yml` passed on `23103914102`.
+- Current result: PR `#372` is ready for final human review as the first `2.6.0` feature candidate.
