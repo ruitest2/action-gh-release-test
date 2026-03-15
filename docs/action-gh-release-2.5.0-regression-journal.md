@@ -280,8 +280,10 @@ Verification notes:
 - PR `#752` clarifies the token precedence docs in `action.yml` and `README.md`; it does not change runtime behavior.
 - `#541` is still open after the `#751` merge.
   `.github/workflows/repro-empty-token.yml` still failed on `23101560199` with `Parameter token or opts.auth is required`, so the empty-string token case needs its own follow-up.
-- Active next fix target: `#571`.
-  Use `.github/workflows/repro-finalize-race.yml` against the PR head and require the seeded-draft path to end with exactly one release for the tag and no orphan drafts.
+- PR `#753` (`chenrui333:finalize-draft-cleanup`, head `668685d61516413a52c2e3c11ed15fd50bb57f14`) folds the duplicate-draft cleanup path into one helper and is ready for final human review.
+  `.github/workflows/repro-finalize-race.yml` passed on `23101838821`; the enabled workers all reported `success`, and tag `v709final.23101838821.1` ended with one published release (`297105698`) containing `finalize-asset-1.txt` through `finalize-asset-4.txt`.
+  `.github/workflows/repro-race.yml` also passed on `23101838828` as a non-regression check for `#705`; the enabled workers all reported `success`, and tag `v709.23101838828.1` ended with one published release (`297105765`) containing `asset-1.txt` through `asset-4.txt`.
+  Upstream `build` passed on `23101833668`.
 
 ## Version Recommendation
 
