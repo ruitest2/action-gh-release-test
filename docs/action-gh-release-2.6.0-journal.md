@@ -330,6 +330,30 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
 - Notable platform note from the verification runs:
   GitHub still emits Node 20 deprecation annotations for `actions/checkout@v4`, `actions/upload-artifact@v4`, and the upstream action under test during these runs. That is useful release-train context, but it is not a harness defect and should stay separate from harness-only maintenance.
 
+### 2026-03-15: harness-owned marketplace action refresh
+
+- Follow-up reason:
+  the harness audit surfaced Node 20 deprecation annotations from the harness-owned marketplace actions. That is separate from the upstream action runtime, so the harness should stay current on the latest stable GitHub-maintained actions.
+- Stable versions verified during this pass:
+  - `actions/checkout`: `v6.0.2`
+  - `actions/upload-artifact`: `v7.0.0`
+  - `actions/download-artifact`: `v8.0.1`
+  - `actions/github-script`: `v8`
+- What changed in this repo:
+  - bumped all workflow references to the current stable majors:
+    - `actions/checkout@v6`
+    - `actions/upload-artifact@v7`
+    - `actions/download-artifact@v8`
+    - `actions/github-script@v8`
+- Verification:
+  - `actionlint` passed after the version updates
+  - race workflow rerun on exact upstream ref `v2.6.0`:
+    - run: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23116968216`
+    - tag: `v709.23116968216.1`
+- Final result:
+  - the harness-owned Node 20 deprecation annotations from `actions/checkout`, `actions/upload-artifact`, and `actions/download-artifact` are gone
+  - the remaining Node 20 deprecation annotation is only for `./action-under-test`, which is upstream runtime behavior and must be handled in `softprops/action-gh-release`, not in this harness
+
 ## Current Status
 
 - Journal created on 2026-03-15.
