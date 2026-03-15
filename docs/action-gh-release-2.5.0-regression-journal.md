@@ -17,6 +17,7 @@ Use this journal as the current evidence set for the 2.5.0 bug cluster and the r
   - `.github/workflows/repro-dotfile.yml`
   - `.github/workflows/repro-duplicate-asset.yml`
   - `.github/workflows/repro-windows.yml`
+  - `.github/workflows/repro-blocked-tag.yml`
   - `.github/workflows/trigger-prerelease.yml`
 
 ## Release Notes Label Mapping
@@ -78,6 +79,17 @@ For the currently relevant PRs:
 - `#729` Windows credential issue not reproduced in same-repo testing
   - attempt: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23097970083`
   - outcome: Windows created a draft prerelease successfully for `v729.23097970083.11`
+- `#729` still does not reproduce in remote-repository Windows testing on current `master`
+  - repro refresh: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100750572`
+  - tag used: `v729.23100750572.11`
+  - release repository: `chenrui333/action-gh-release`
+  - outcome: the workflow succeeded on Windows with a PAT-backed remote `repository:` target, so this harness still does not hit the reported `Bad credentials` failure
+- `#722` orphaned draft release when tag creation is blocked reproduces on current `master`
+  - repro refresh: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100875487`
+  - tag used: `v722.23100875487.1`
+  - release repository: `chenrui333/action-gh-release`
+  - action evidence: the action created draft release `297099280`, uploaded `blocked-tag.txt`, then failed finalization three times with `pre_receive Repository rule violations found` and `Published releases must have a valid tag`
+  - harness evidence: `getReleaseByTag` did not see the orphan draft, but `listReleases` found it and the harness cleanup removed both the draft release and the temporary ruleset after summarizing the run
 
 ## Not Reproducible Here
 
@@ -117,8 +129,8 @@ The recent 2.5.x regression cluster is merged into current `master`.
 
 The next open bug-fix candidates are:
 
-- `#729` Windows x64 remote-repository release lookup failure
 - `#722` orphaned draft release when tag creation is blocked by repo rules
+- `#729` Windows x64 remote-repository release lookup failure, which still does not reproduce in this harness
 
 Fresh `v2.5.1` baselines for the next bug-fix round:
 
@@ -147,8 +159,9 @@ Fresh `v2.5.1` baselines for the next bug-fix round:
 Recommended scope for the next bug-fix pass:
 
 1. Keep `.github/workflows/repro-duplicate-asset.yml` as the regression guard for `#740`
-2. Reproduce `#729` and `#722` on current `master`
-3. Prepare the next fix PR from whichever of `#729` and `#722` is confirmed and tractable first
+2. Keep `.github/workflows/repro-blocked-tag.yml` as the regression guard for `#722`
+3. Prepare the next fix PR for `#722`
+4. Revisit `#729` only if new evidence narrows the Windows-specific credential failure
 
 ## Active Fix Candidates
 
@@ -196,7 +209,7 @@ Recommended scope for the next bug-fix pass:
 
 1. Keep `.github/workflows/repro-dotfile.yml` as the fixed regression guard for `#741`
 2. Keep `.github/workflows/repro-duplicate-asset.yml` as the fixed regression guard for `#740`
-3. Reproduce `#729` and `#722`
+3. Keep `.github/workflows/repro-blocked-tag.yml` as the active repro for `#722`
 4. Keep labeling any new bug-fix PR `bug`
 
 ## Version Recommendation

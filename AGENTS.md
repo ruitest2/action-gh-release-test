@@ -28,6 +28,8 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Use `.github/workflows/repro-dotfile.yml` for dotfile asset-name behavior (`#741`).
 - Use `.github/workflows/repro-duplicate-asset.yml` for same-filename concurrent upload behavior (`#740`).
 - Use `.github/workflows/repro-windows.yml` for Windows-runner regressions (`#729`); treat it as an attempted reproduction unless the workflow actually fails with the reported credential error.
+- Use `.github/workflows/repro-blocked-tag.yml` for blocked-tag finalization and orphan-draft cleanup behavior (`#722`).
+  Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow creates and removes a temporary tag ruleset in the target repository.
 
 ## Done Criteria
 
