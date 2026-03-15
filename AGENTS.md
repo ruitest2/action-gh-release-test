@@ -52,6 +52,8 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Use `.github/workflows/repro-paren-asset.yml` for parentheses filename handling on Windows (`#393`).
 - Use `.github/workflows/repro-target-commitish.yml` for non-latest `target_commitish` release creation (`#411`), and make sure it targets a recent commit that did not modify `.github/workflows/`.
 - Use `.github/workflows/repro-dm-asset.yml` for DexMetadata-style `.dm` asset uploads (`#434`).
+- Use `.github/workflows/repro-previous-tag-release-notes.yml` for the `previous_tag` / explicit-release-notes-range feature work around PR `#372`.
+  This harness seeds two prior releases and only passes if the action-generated release body matches GitHub's `generateReleaseNotes` output for the explicitly requested older `previous_tag`, not the most recent release.
 - Use `.github/workflows/repro-empty-token.yml` only to confirm docs/usage behavior for empty-string token handling (`#541`).
   Do not keep `#541` in the active bug-fix bucket unless the workflow shows a distinct runtime defect beyond the documented `token: ""` semantics.
 - Use `.github/workflows/repro-unicode-asset.yml` only to confirm docs/usage behavior for Unicode and special-character asset naming (`#542`, likely related to `#393`).

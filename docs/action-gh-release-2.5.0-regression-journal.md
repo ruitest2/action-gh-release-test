@@ -444,3 +444,18 @@ Current reopen guidance from this pass:
 - Do not reopen the fixed runtime cases above; the latest `master` runs stayed green.
 - Do not reopen `#411`; the refined harness is now green on current `master`.
 - `#393` is still reproducible, but it remains a docs/platform-limit case unless new evidence shows GitHub now allows the raw release-asset download name to be preserved.
+
+## 2.6.0 Feature Track
+
+Current target:
+
+- PR `#372` (`feat: generate release notes from latest tag`) is the first `2.6.0` feature candidate worth reviving.
+
+Plan:
+
+1. Rebase the PR branch onto the latest upstream `master` and resolve the current merge conflict.
+2. Re-review the rebased implementation against current release flow, especially `generate_release_notes`, release-body construction, and docs/input metadata.
+3. Use `.github/workflows/repro-previous-tag-release-notes.yml` as the feature verifier.
+   The harness seeds two prior releases and only passes if the action-generated release body matches GitHub's `generateReleaseNotes` output for the explicitly requested older `previous_tag`, not the most recent release.
+4. Re-run a small smoke set after the feature verifier to make sure no major existing flows were regressed.
+   Start with `.github/workflows/repro-assets-output.yml` and `.github/workflows/repro-race.yml`, then add another focused harness if the rebase touches adjacent logic.
