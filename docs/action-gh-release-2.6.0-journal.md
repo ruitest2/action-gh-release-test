@@ -246,12 +246,55 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
 - External regression coverage:
   not run for this item because the branch is CI-only and does not change runtime behavior
 
+### 2026-03-15: immutable-release verification
+
+- Upstream branch under test:
+  `verify-immutable-release`
+- Current upstream ref:
+  `fadef12636129a8719d57afbbb21e49964dbb22a`
+- Current upstream outcome:
+  narrow docs plus clearer error messaging, without changing prerelease publish semantics
+- What current GitHub behavior was verified:
+  - GitHub immutable releases reject asset uploads after publish.
+  - Standard releases in `softprops/action-gh-release` already avoid that by uploading assets before publish.
+  - Brand-new prereleases with assets still fail on immutable-release repositories because the action keeps them published by default.
+  - Seeded draft releases still work on immutable-release repositories when they are published after upload.
+  - Current GitHub release workflows observe both `prereleased` and `published` for mutable prerelease creation.
+  - GitHub's documented draft-prerelease path emits `published` rather than preserving a `prereleased`-only contract when the prerelease is published from a draft.
+- Why the attempted draft-first prerelease implementation was not kept:
+  - experimental upstream ref `462b2120fceb6ce294bbe4aae610b205578cb545` made immutable prerelease uploads succeed
+  - the same ref changed the downstream event contract by publishing from a draft, which GitHub surfaced through `published`
+  - because that event shift is platform-controlled, the final `2.6.0` branch kept current prerelease semantics and switched to clearer docs and a clearer immutable-release error instead of a silent contract change
+- Final upstream change now covers:
+  - a more actionable immutable-release upload error for prerelease asset uploads
+  - README and `action.yml` clarification for immutable prerelease usage with `draft: true`
+- Harness coverage added in this repo:
+  - `TESTS.md` now captures the major user-facing regression scenarios for future release trains
+  - `.github/workflows/repro-draft-false.yml` now supports both:
+    - mutable success verification with `expected_release_outcome: success`
+    - immutable prerelease limitation verification with `expected_release_outcome: failure`
+  - `AGENTS.md` now points future maintainers at `TESTS.md` and the immutable-release workflow expectations
+- Regression evidence against `fadef12636129a8719d57afbbb21e49964dbb22a`:
+  - immutable prerelease limitation, expected failure:
+    `https://github.com/ruitest2/action-gh-release-test/actions/runs/23116148551`
+  - immutable seeded draft reuse and publish:
+    `https://github.com/ruitest2/action-gh-release-test/actions/runs/23116148548`
+  - mutable prerelease `draft: false` success:
+    `https://github.com/ruitest2/action-gh-release-test/actions/runs/23116163991`
+  - mutable prerelease observers:
+    `https://github.com/ruitest2/action-gh-release-test/actions/runs/23116186045`
+  - observer workflow runs from the mutable prerelease check:
+    - `observe-prereleased`: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23116188001`
+    - `observe-published`: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23116188071`
+- Notable upstream log evidence:
+  the immutable failure-mode run now surfaces:
+  `Cannot upload asset draft-false.txt to an immutable release. GitHub only allows asset uploads before a release is published, but draft prereleases publish with the release.published event instead of release.prereleased.`
+
 ## Current Status
 
 - Journal created on 2026-03-15.
 - The renamed-asset concurrent-upload fix is merged on upstream `master`.
 - The `working_directory` docs sync is merged on upstream `master`.
 - The `dist/index.js` freshness guard is merged on upstream `master`.
-- Next active `2.6.0` item:
-  verify immutable-release compatibility and only code if current `master` still publishes too early.
-- Immutable-release verification remains the last open `2.6.0` research or implementation candidate from this journal.
+- Immutable-release verification is complete enough for maintainer review.
+- No further `2.6.0` runtime candidates are active in this journal after the immutable prerelease clarification branch.
