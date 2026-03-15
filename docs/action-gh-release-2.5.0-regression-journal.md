@@ -417,5 +417,6 @@ Progress update:
 - PR head `88e03fa` passed `.github/workflows/repro-home-tilde.yml` in run `23103057838`, and upstream run `23103058361` was green before merge.
 - PR `#757` attempted to restore the original raw asset name after upload for `#393`, but `.github/workflows/repro-paren-asset.yml` still failed in run `23103104859`.
 - That run showed GitHub kept the raw asset name normalized as `appName.x64._1.0.0.1.msi` while preserving only the label `appName(x64)_1.0.0.1.msi`, so this looks like the same platform-limit behavior reported in `#159`.
-- `.github/workflows/repro-target-commitish.yml` has been tightened to target a recent non-workflow commit before deciding whether `#411` is still reproducible on current `master`.
-- The active next check is rerunning `#411` with that refined harness.
+- `.github/workflows/repro-target-commitish.yml` was tightened to target a recent non-workflow commit and then rerun on current `master` in `23103170201`.
+- That rerun still hit `403 Resource not accessible by integration`, and the direct `git.createRef` diagnostic also failed with the same permission boundary for the same target SHA.
+- Current evidence points to `#411` being a `github.token` permission limit for older-commit tag creation rather than an action-side bug, so it belongs in docs guidance instead of the current bug-fix queue.
