@@ -407,3 +407,8 @@ Execution order:
 3. `#403`
 4. `#393`
 5. `#411`
+
+Progress update:
+
+- `#754` merged on upstream `master` as `21ae1a1` and fixed the Windows glob family (`#280`, `#614`, `#311`).
+- The active next fix is `#403`, using `.github/workflows/repro-existing-release-ref-tag.yml` as the verifier.
