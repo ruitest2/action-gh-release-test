@@ -375,7 +375,7 @@ Current results against `softprops/action-gh-release@26c9a934b1010109e8457032a12
 - `#403` still reproduces. `.github/workflows/repro-existing-release-ref-tag.yml` failed on `23102772302`; `tag_name: refs/tags/...` caused the action to create a second release for the prefixed tag, then hit `Validation Failed` / `already_exists` during finalization instead of reusing the seeded release.
 - `#393` still reproduces. `.github/workflows/repro-paren-asset.yml` failed on `23102772298`; the action restored the asset label, but the raw asset name used for the download remained normalized, so the original parentheses filename was not preserved end to end.
 - `#280`, `#614`, and `#311` still reproduce. `.github/workflows/repro-windows-glob.yml` failed on `23102772296`; Windows-style backslash globs logged `Pattern '.\\release-assets\\rssguard-*win7.exe' does not match any files` and no assets were uploaded.
-- `#411` still reproduces. `.github/workflows/repro-target-commitish.yml` failed on `23102772301`; creating a release against the previous commit SHA returned `403 Resource not accessible by integration` instead of creating the release at the requested `target_commitish`.
+- `#411` is not confirmed yet. `.github/workflows/repro-target-commitish.yml` failed on `23102772301`, but that run targeted commit `8af892a`, which changed `.github/workflows/*`; with `github.token`, that can legitimately return `403 Resource not accessible by integration`, so the harness needed to be refined before treating this as an action bug.
 
 Current reopen-candidate list from this pass:
 
@@ -417,4 +417,5 @@ Progress update:
 - PR head `88e03fa` passed `.github/workflows/repro-home-tilde.yml` in run `23103057838`, and upstream run `23103058361` was green before merge.
 - PR `#757` attempted to restore the original raw asset name after upload for `#393`, but `.github/workflows/repro-paren-asset.yml` still failed in run `23103104859`.
 - That run showed GitHub kept the raw asset name normalized as `appName.x64._1.0.0.1.msi` while preserving only the label `appName(x64)_1.0.0.1.msi`, so this looks like the same platform-limit behavior reported in `#159`.
-- The active next fix is `#411`, using `.github/workflows/repro-target-commitish.yml` as the verifier.
+- `.github/workflows/repro-target-commitish.yml` has been tightened to target a recent non-workflow commit before deciding whether `#411` is still reproducible on current `master`.
+- The active next check is rerunning `#411` with that refined harness.

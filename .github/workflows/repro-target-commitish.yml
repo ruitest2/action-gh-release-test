@@ -32,10 +32,26 @@ jobs:
           ref: ${{ inputs.action_ref }}
           path: action-under-test
 
-      - name: Resolve previous commit
+      - name: Resolve previous non-workflow commit
         id: previous
+        shell: bash
         run: |
-          echo "sha=$(git rev-parse HEAD^)" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          target_sha=""
+          while read -r sha; do
+            files="$(git show --pretty=format: --name-only "$sha")"
+            if [ -n "$files" ] && ! grep -q '^\.github/workflows/' <<<"$files"; then
+              target_sha="$sha"
+              break
+            fi
+          done < <(git rev-list --max-count=50 HEAD)
+
+          if [ -z "$target_sha" ]; then
+            echo "failed to find a non-workflow commit in recent history" >&2
+            exit 1
+          fi
+
+          echo "sha=$target_sha" >> "$GITHUB_OUTPUT"
 
       - name: Prepare asset
         run: |

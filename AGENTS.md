@@ -50,7 +50,7 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Use `.github/workflows/repro-body-too-long.yml` for large body handling and env-size stress around release notes (`#374`, `#471`).
 - Use `.github/workflows/repro-many-files.yml` for large asset-count behavior (`#335`).
 - Use `.github/workflows/repro-paren-asset.yml` for parentheses filename handling on Windows (`#393`).
-- Use `.github/workflows/repro-target-commitish.yml` for non-latest `target_commitish` release creation (`#411`).
+- Use `.github/workflows/repro-target-commitish.yml` for non-latest `target_commitish` release creation (`#411`), and make sure it targets a recent commit that did not modify `.github/workflows/`.
 - Use `.github/workflows/repro-dm-asset.yml` for DexMetadata-style `.dm` asset uploads (`#434`).
 - Use `.github/workflows/repro-empty-token.yml` only to confirm docs/usage behavior for empty-string token handling (`#541`).
   Do not keep `#541` in the active bug-fix bucket unless the workflow shows a distinct runtime defect beyond the documented `token: ""` semantics.
