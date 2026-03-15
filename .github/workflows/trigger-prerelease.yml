@@ -55,6 +55,7 @@ jobs:
           printf 'prerelease repro %s\n' "$TAG_NAME" > prerelease.txt
 
       - name: Create prerelease
+        id: release
         uses: ./action-under-test
         with:
           prerelease: true
@@ -69,10 +70,16 @@ jobs:
           EXPECTED_PRERELEASED: ${{ inputs.expected_prereleased }}
           EXPECTED_PUBLISHED: ${{ inputs.expected_published }}
           HAS_TRIGGER_TOKEN: ${{ env.HAS_TRIGGER_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          STEP_OUTCOME: ${{ steps.release.outcome }}
           TAG_NAME: ${{ env.TAG_NAME }}
         with:
           github-token: ${{ github.token }}
           script: |
+            const {
+              getReleaseByTagOrNull,
+              writeJsonSummary,
+            } = require(`${process.env.GITHUB_WORKSPACE}/scripts/release-harness.js`);
             const tagName = process.env.TAG_NAME;
             const expectedPrereleased = process.env.EXPECTED_PRERELEASED;
             const expectedPublished = process.env.EXPECTED_PUBLISHED;
@@ -115,34 +122,29 @@ jobs:
               }
             };
 
-            core.summary
-              .addHeading("Prerelease observer check")
-              .addRaw(`Tag: ${tagName}\n`)
-              .addRaw(`Custom trigger token configured: ${hasTriggerToken}\n`)
-              .addRaw(`Prereleased observer runs: ${prereleasedRuns.length}\n`)
-              .addRaw(`Published observer runs: ${publishedRuns.length}\n`)
-              .addCodeBlock(
-                JSON.stringify(
-                  {
-                    prereleased_runs: prereleasedRuns.map((run) => ({
-                      id: run.id,
-                      status: run.status,
-                      conclusion: run.conclusion,
-                      display_title: run.display_title,
-                    })),
-                    published_runs: publishedRuns.map((run) => ({
-                      id: run.id,
-                      status: run.status,
-                      conclusion: run.conclusion,
-                      display_title: run.display_title,
-                    })),
-                  },
-                  null,
-                  2,
-                ),
-                "json",
-              )
-              .write();
+            const release = await getReleaseByTagOrNull({
+              github,
+              owner,
+              repo,
+              tag: tagName,
+            });
+            const runSummary = (run) => ({
+              id: run.id,
+              status: run.status,
+              conclusion: run.conclusion,
+              display_title: run.display_title,
+              url: run.html_url || run.url,
+            });
+
+            await writeJsonSummary(core, "Prerelease observer check", {
+              run_url: process.env.RUN_URL,
+              tag_name: tagName,
+              step_outcome: process.env.STEP_OUTCOME,
+              custom_trigger_token_configured: hasTriggerToken,
+              release_url: release?.html_url ?? null,
+              prereleased_runs: prereleasedRuns.map(runSummary),
+              published_runs: publishedRuns.map(runSummary),
+            });
 
             if (!hasTriggerToken && prereleasedRuns.length === 0 && publishedRuns.length === 0) {
               core.setFailed(

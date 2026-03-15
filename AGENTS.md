@@ -8,7 +8,10 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Keep the workflow intentionally small and focused on end-to-end release behavior.
 - Keep [TESTS.md](TESTS.md) current as the major user-facing regression matrix. Update it whenever a new workflow becomes the primary verifier for a feature surface or release path.
 - Keep `v2.6.0` as the default released baseline in workflow inputs unless a newer released baseline intentionally replaces it.
-- When testing a specific upstream PR or commit, override the workflow `action_ref` with the exact `softprops/action-gh-release` ref under test. `e2e.yml` is the only push-only smoke workflow, so pin its `uses:` ref temporarily when you need an exact-ref smoke run.
+- When testing a specific upstream PR or commit, override the workflow `action_ref` with the exact `softprops/action-gh-release` ref under test.
+  `e2e.yml` now supports both:
+  - tag-push smoke on released `v2.6.0`
+  - `workflow_dispatch` exact-ref smoke via checked-out `action-under-test`
 - Prefer disposable branches and unique tags for each regression run so the resulting workflow runs and releases are easy to trace.
 - Do not remove existing historical test tags, releases, or uploaded assets from this repo unless the user explicitly asks for cleanup. They are part of the external evidence set.
 - Keep `test-assets/` stable unless a regression case explicitly requires different fixtures.
@@ -22,7 +25,8 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - If the upstream changes only exist locally in `$HOME/softprops/action-gh-release`, push them to a branch or fork first; this repo's workflows check out a remote ref.
 - Start with `docs/action-gh-release-2.5.0-regression-journal.md` when you need the current evidence set, merge order, or known harness limitations for the 2.5.0 bug cluster.
   After `v2.5.1`, treat that journal as the running plan for the next bug-fix round as well; it records which regressions were fixed in `2.5.1` and which open bugs remain.
-- Keep the default `e2e.yml` for simple tag-based smoke testing of release creation and asset upload on released upstream `v2.6.0`.
+- Keep the default `e2e.yml` for simple smoke testing of release creation and asset upload on released upstream `v2.6.0`.
+  Use tag pushes for the default released-baseline path and `workflow_dispatch` when you need an exact upstream ref without editing the workflow.
 - Use `.github/workflows/repro-make-latest.yml` for the `make_latest: false` regression and fix verification (`#703`, PR `#715`).
 - Use `.github/workflows/repro-assets-output.yml` for invalid `assets` output URLs and fix verification (`#713`, `#222`, PR `#738`).
   It is the primary Linux verifier for the release outputs contract: `assets`, `url`, `id`, and `upload_url`. Keep the workflow default on `expected_url_kind: tagged` unless you are intentionally reproducing the old broken behavior.
@@ -31,6 +35,7 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
   Re-run both against released upstream `v2.6.0` or the exact upstream ref under test before opening a race-fix PR so the journal reflects which race still reproduces after the latest merged fixes.
 - Use `.github/workflows/trigger-prerelease.yml` together with `.github/workflows/observe-prereleased.yml` and `.github/workflows/observe-published.yml` for prerelease event behavior (`#708`).
   Configure an `ACTION_GH_RELEASE_TRIGGER_TOKEN` repo secret first; release workflows triggered with the default `GITHUB_TOKEN` are suppressed by GitHub and will not exercise the observer workflows.
+  The summary now records the created release URL plus observer workflow run URLs so the run evidence is easier to reuse in journals and upstream reports.
 - Use `.github/workflows/repro-dotfile.yml` for dotfile asset-name behavior (`#741`).
 - Use `.github/workflows/repro-duplicate-asset.yml` for same-filename concurrent upload behavior (`#740`) and renamed-asset race checks.
   The workflow accepts `asset_name` and `expected_display_name`, so reuse it for both plain filenames and GitHub-renamed assets such as `.config`.
@@ -46,9 +51,9 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Use `.github/workflows/repro-brace-glob.yml` for brace/comma glob parsing (`#611`, `#204`).
 - Use `.github/workflows/repro-windows-glob.yml` for Windows backslash-heavy file glob behavior (`#280`, `#614`, `#311`).
 - Use `.github/workflows/repro-remote-repo.yml` for remote-repository release creation and asset upload (`#639`, `#308`).
-  Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow targets a separate repository and cleans up the test release after inspection.
+  Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow targets a separate repository and now cleans up both the test release and the matching remote tag after inspection.
 - Use `.github/workflows/repro-token-precedence.yml` for remote-repository token precedence (`#639`).
-  Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow intentionally sets `GITHUB_TOKEN` and expects the explicit `token` input to win.
+  Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow intentionally sets `GITHUB_TOKEN` and expects the explicit `token` input to win, then cleans up both the test release and the matching remote tag.
 - Use `.github/workflows/repro-existing-draft.yml` for existing-draft reuse and draft-state behavior (`#163`, PR `#245`).
   Pass `draft_mode: keep` to verify the release stays draft, or `draft_mode: publish` to verify the seeded draft is reused and then published when `draft` is omitted.
 - Use `.github/workflows/repro-draft-false.yml` for `draft: false` behavior when creating prereleases outside a tag-triggered job (`#253`, `#379`).

@@ -107,9 +107,13 @@ jobs:
         uses: actions/github-script@v8
         env:
           RELEASE_ID: ${{ steps.inspect.outputs.release_id }}
+          TAG_NAME: ${{ env.TAG_NAME }}
         with:
           github-token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
           script: |
+            const {
+              deleteTagIfExists,
+            } = require(`${process.env.GITHUB_WORKSPACE}/scripts/release-harness.js`);
             const [owner, repo] = process.env.RELEASE_REPOSITORY.split("/");
             if (process.env.RELEASE_ID) {
               await github.rest.repos.deleteRelease({
@@ -118,4 +122,9 @@ jobs:
                 release_id: Number(process.env.RELEASE_ID),
               });
             }
-
+            await deleteTagIfExists({
+              github,
+              owner,
+              repo,
+              tag: process.env.TAG_NAME,
+            });

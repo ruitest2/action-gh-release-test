@@ -14,6 +14,23 @@ async function getReleaseByTagOrNull({ github, owner, repo, tag }) {
   }
 }
 
+async function deleteTagIfExists({ github, owner, repo, tag }) {
+  try {
+    await github.request("DELETE /repos/{owner}/{repo}/git/refs/{ref}", {
+      owner,
+      repo,
+      ref: `tags/${tag}`,
+    });
+  } catch (error) {
+    if (
+      error.status !== 404 &&
+      !(error.status === 422 && /Reference does not exist/i.test(error.message))
+    ) {
+      throw error;
+    }
+  }
+}
+
 function writeJsonSummary(core, heading, summary) {
   return core.summary
     .addHeading(heading)
@@ -22,6 +39,7 @@ function writeJsonSummary(core, heading, summary) {
 }
 
 module.exports = {
+  deleteTagIfExists,
   getReleaseByTagOrNull,
   writeJsonSummary,
 };

@@ -1,6 +1,27 @@
 name: e2e
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch'
+      && format('e2e-{0}', inputs.action_ref)
+      || format('e2e-{0}', github.ref_name) }}
 
-on: push
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: v2.6.0
+      tag_name:
+        description: Optional tag name override for manual exact-ref smoke runs
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -8,14 +29,122 @@ permissions:
 jobs:
   e2e-test:
     runs-on: ubuntu-latest
-
     steps:
+      - id: vars
+        shell: bash
+        env:
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -n "$INPUT_TAG_NAME" ]; then
+              tag_name="$INPUT_TAG_NAME"
+            else
+              tag_name="ve2e.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+            fi
+          else
+            tag_name="${GITHUB_REF_NAME}"
+          fi
+          echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v6
 
-      - name: Release
+      - if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Release with pinned baseline
+        id: release_push
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2.6.0
-        if: github.ref_type == 'tag'
         with:
           files: |
             test-assets/release-notes.md
             test-assets/sample-asset.txt
+
+      - name: Release with exact ref
+        id: release_dispatch
+        if: github.event_name == 'workflow_dispatch'
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ steps.vars.outputs.tag_name }}
+          name: E2E smoke ${{ steps.vars.outputs.tag_name }}
+          files: |
+            test-assets/release-notes.md
+            test-assets/sample-asset.txt
+
+      - name: Summarize release evidence
+        if: always()
+        uses: actions/github-script@v8
+        env:
+          ACTION_REF: ${{ inputs.action_ref }}
+          ACTION_REPOSITORY: ${{ inputs.action_repository }}
+          DISPATCH_OUTCOME: ${{ steps.release_dispatch.outcome }}
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_OUTCOME: ${{ steps.release_push.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TAG_NAME: ${{ steps.vars.outputs.tag_name }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const {
+              getReleaseByTagOrNull,
+              writeJsonSummary,
+            } = require(`${process.env.GITHUB_WORKSPACE}/scripts/release-harness.js`);
+            const { owner, repo } = context.repo;
+            const eventName = process.env.EVENT_NAME;
+            const tagName = process.env.TAG_NAME;
+            const releaseOutcome =
+              eventName === "workflow_dispatch"
+                ? process.env.DISPATCH_OUTCOME
+                : process.env.PUSH_OUTCOME;
+            const release = await getReleaseByTagOrNull({
+              github,
+              owner,
+              repo,
+              tag: tagName,
+            });
+
+            const summary = {
+              event_name: eventName,
+              run_url: process.env.RUN_URL,
+              tag_name: tagName,
+              action_repository:
+                eventName === "workflow_dispatch"
+                  ? process.env.ACTION_REPOSITORY
+                  : "softprops/action-gh-release",
+              action_ref:
+                eventName === "workflow_dispatch" ? process.env.ACTION_REF : "v2.6.0",
+              step_outcome: releaseOutcome,
+              release: release
+                ? {
+                    id: release.id,
+                    html_url: release.html_url,
+                    upload_url: release.upload_url,
+                    asset_names: release.assets.map((asset) => asset.name),
+                  }
+                : null,
+            };
+
+            await writeJsonSummary(core, "E2E release summary", summary);
+
+            if (releaseOutcome !== "success") {
+              core.setFailed("e2e release step did not succeed");
+              return;
+            }
+
+            if (!release) {
+              core.setFailed(`no release found for ${tagName}`);
+              return;
+            }
+
+            const expectedAssets = ["release-notes.md", "sample-asset.txt"];
+            for (const assetName of expectedAssets) {
+              if (!release.assets.some((asset) => asset.name === assetName)) {
+                core.setFailed(`missing expected asset ${assetName}`);
+                return;
+              }
+            }
