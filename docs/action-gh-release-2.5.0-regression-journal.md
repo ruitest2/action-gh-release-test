@@ -411,4 +411,6 @@ Execution order:
 Progress update:
 
 - `#754` merged on upstream `master` as `21ae1a1` and fixed the Windows glob family (`#280`, `#614`, `#311`).
-- The active next fix is `#403`, using `.github/workflows/repro-existing-release-ref-tag.yml` as the verifier.
+- `#755` is the active PR for `#403` on branch `refs-tag-name`.
+- The rebased PR head `413200b` passed `.github/workflows/repro-existing-release-ref-tag.yml` in run `23103004409`.
+- Upstream PR run `23103004159` is green, and the consumer repro now reuses the seeded release cleanly for `tag_name: refs/tags/...`.
