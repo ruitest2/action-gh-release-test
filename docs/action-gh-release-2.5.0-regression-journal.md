@@ -119,10 +119,15 @@ The remaining open bug cluster tied to the recent 2.5.x regressions is:
 
 Fresh `v2.5.1` baselines for the next bug-fix round:
 
-- `#740` did not reproduce on current `master` after `#746`
-  - repro refresh: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100031851`
-  - tag used: `v740.23100031851.1`
-  - outcome: both uploaders succeeded, the release ended with a single `shared.txt`, and the final asset content matched the later finisher
+- `#740` reproduces on current `master`
+  - repro refresh: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100479521`
+  - tag used: `v740.23100479521.1`
+  - observed worker outcomes:
+    - uploader 1: `success`
+    - uploader 2: `failure`
+  - worker evidence: uploader 2 aborted during the upload step with `Not Found - https://docs.github.com/rest/releases/assets#update-a-release-asset`
+  - resulting release state: `https://github.com/ruitest2/action-gh-release-test/releases/tag/v740.23100479521.1`
+  - outcome: the published release ended with zero assets
 - `#708` reproduces on current `master` once the harness uses a PAT-backed trigger token
   - repro: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100150348`
   - tag used: `v708.23100150348.1-rc.1`
@@ -138,8 +143,8 @@ Fresh `v2.5.1` baselines for the next bug-fix round:
 
 Recommended scope for `2.5.2`:
 
-1. Verify `#741` stays fixed on `master`
-2. Decide whether `#740` needs explicit hardening beyond the now-green `master` baseline
+1. Merge the verified `#740` fix candidate
+2. Keep `.github/workflows/repro-duplicate-asset.yml` as the regression guard for the same-filename race
 3. Revisit older non-runtime bugs only after the 2.5.0-era regression cluster is exhausted
 
 ## Active Fix Candidates
@@ -171,11 +176,23 @@ Recommended scope for `2.5.2`:
     - raw name: `default.config`
     - label: `.config`
   - interpretation: current `master` restores the displayed dotfile name while preserving GitHub's normalized raw asset name
+- PR `#745` `fix: handle upload already_exists races across workflows`
+  - merge target: `https://github.com/softprops/action-gh-release/pull/745`
+  - upstream build: `https://github.com/softprops/action-gh-release/actions/runs/23100595292`
+  - verify: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100613403`
+  - tag used: `v740.23100613403.1`
+  - observed worker outcomes:
+    - uploader 1: `success`
+    - uploader 2: `success`
+  - resulting release state: `https://github.com/ruitest2/action-gh-release-test/releases/tag/v740.23100613403.1`
+  - observed release asset list:
+    - `shared.txt`
+  - interpretation: the rebased `#745` branch fixes the same-filename concurrent upload race on top of the `#746` canonicalization changes
 
 ## Next Execution Order
 
 1. Keep `.github/workflows/repro-dotfile.yml` as the fixed regression guard for `#741`
-2. Revisit `#740` only if we still want an explicit asset-race hardening PR after the now-green `master` baseline
+2. Merge `#745` for `#740`
 3. Keep labeling any new bug-fix PR `bug`
 
 ## Version Recommendation
