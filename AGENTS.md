@@ -16,6 +16,7 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Use `workflow_dispatch` on `main` and pass the exact upstream `action_repository` and `action_ref` under test.
 - If the upstream changes only exist locally in `/Users/rchen/softprops/action-gh-release`, push them to a branch or fork first; this repo's workflows check out a remote ref.
 - Start with `docs/action-gh-release-2.5.0-regression-journal.md` when you need the current evidence set, merge order, or known harness limitations for the 2.5.0 bug cluster.
+  After `v2.5.1`, treat that journal as the running plan for the next bug-fix round as well; it records which regressions were fixed in `2.5.1` and which open bugs remain.
 - Keep the default `e2e.yml` for simple tag-based smoke testing of release creation and asset upload.
 - Use `.github/workflows/repro-make-latest.yml` for the `make_latest: false` regression and fix verification (`#703`, PR `#715`).
 - Use `.github/workflows/repro-assets-output.yml` for invalid `assets` output URLs and fix verification (`#713`, PR `#738`).

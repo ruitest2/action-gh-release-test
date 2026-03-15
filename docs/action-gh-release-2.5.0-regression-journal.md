@@ -105,12 +105,34 @@ As of 2026-03-14, the following fix PRs are merged into `softprops/action-gh-rel
 The dedicated `#704` / `#709` finalize-race regression is no longer reproducible on current `master`.
 The remaining confirmed race bug is the older shared-tag duplicate-release path in `#705` (and likely `#740`).
 
+## 2.5.1 Shipped State
+
+`softprops/action-gh-release` released `v2.5.1` on 2026-03-14:
+
+- release: `https://github.com/softprops/action-gh-release/releases/tag/v2.5.1`
+- closed after release: `#703`, `#704`, `#709`
+
+That means the next bug-fix round should no longer spend time on the `#704` / `#709` finalize path except as historical regression evidence.
+The remaining open bug cluster for the next release is:
+
+- `#705` shared-tag duplicate release race
+- `#708` prereleased event regression from the draft-first release flow
+- `#741` dotfile asset name regression
+- `#742` Node 24 runtime migration
+
+Recommended scope for `2.5.2`:
+
+1. Fix `#705` first and expect that it may also improve `#740`
+2. Attempt `#708` only if the harness has `ACTION_GH_RELEASE_TRIGGER_TOKEN` configured; otherwise record it as still blocked in this repo
+3. Keep `#741` and `#742` as follow-up work unless they naturally fit after the race fix
+
 ## Next Execution Order
 
-1. Treat `#704` / `#709` as already covered by the merged fixes now on `softprops/action-gh-release/master`
-2. If shipping `2.5.1` immediately, cut it from current `master` using the evidence in this journal
-3. If doing one more bug-fix round first, target `#705` and re-run `.github/workflows/repro-race.yml` plus `.github/workflows/repro-duplicate-asset.yml`
-4. Label any new bug-fix PR `bug`
+1. Re-run `.github/workflows/repro-race.yml` against current `softprops/action-gh-release/master` or `v2.5.1` to keep a fresh baseline for `#705`
+2. Attempt `.github/workflows/trigger-prerelease.yml` for `#708`; if the trigger token is still missing, record that the issue remains blocked in this harness
+3. Build the next upstream bug-fix PR from current `master`, starting with `#705`
+4. Re-run the relevant regression workflows against the fix branch
+5. Label any new bug-fix PR `bug`
 
 ## Version Recommendation
 
