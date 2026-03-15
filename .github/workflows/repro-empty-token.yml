@@ -1,0 +1,113 @@
+name: repro-empty-token
+run-name: repro-empty-token-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: master
+
+permissions:
+  contents: write
+
+jobs:
+  repro:
+    runs-on: ubuntu-latest
+    env:
+      TAG_NAME: v541.${{ github.run_id }}.${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Prepare asset
+        run: |
+          printf 'empty token repro for %s\n' "${TAG_NAME}" > empty-token.txt
+
+      - name: Attempt release with empty token
+        id: release
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Empty token repro ${{ env.TAG_NAME }}
+          draft: true
+          token: ""
+          files: empty-token.txt
+
+      - name: Summarize empty token outcome
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+          STEP_OUTCOME: ${{ steps.release.outcome }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const release = releases.find((candidate) => candidate.tag_name === process.env.TAG_NAME);
+            const summary = {
+              tag_name: process.env.TAG_NAME,
+              step_outcome: process.env.STEP_OUTCOME,
+              release: release
+                ? {
+                    id: release.id,
+                    draft: release.draft,
+                    asset_names: release.assets.map((asset) => asset.name),
+                    html_url: release.html_url,
+                  }
+                : null,
+            };
+
+            core.summary
+              .addHeading("Empty token summary")
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+
+            if (process.env.STEP_OUTCOME !== "success") {
+              core.setFailed("empty token input did not fall back to the default token");
+            }
+
+            if (!release) {
+              core.setFailed(`no release found for ${process.env.TAG_NAME}`);
+            }
+          result-encoding: string
+
+      - name: Cleanup draft release
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const release = releases.find((candidate) => candidate.tag_name === process.env.TAG_NAME);
+            if (release) {
+              await github.rest.repos.deleteRelease({
+                owner,
+                repo,
+                release_id: release.id,
+              });
+            }
+

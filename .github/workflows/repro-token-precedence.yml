@@ -1,0 +1,121 @@
+name: repro-token-precedence
+run-name: repro-token-precedence-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: master
+      release_repository:
+        description: Repository to publish the release into
+        required: true
+        default: chenrui333/action-gh-release
+
+permissions:
+  contents: write
+
+jobs:
+  repro:
+    runs-on: ubuntu-latest
+    env:
+      TAG_NAME: v639token.${{ github.run_id }}.${{ github.run_attempt }}
+      RELEASE_REPOSITORY: ${{ inputs.release_repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Prepare asset
+        run: |
+          printf 'token precedence repro for %s\n' "${TAG_NAME}" > token-precedence.txt
+
+      - name: Attempt remote release
+        id: release
+        continue-on-error: true
+        uses: ./action-under-test
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Token precedence repro ${{ env.TAG_NAME }}
+          draft: true
+          repository: ${{ inputs.release_repository }}
+          token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
+          files: token-precedence.txt
+
+      - name: Summarize token precedence outcome
+        if: always()
+        id: inspect
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
+          script: |
+            const [owner, repo] = process.env.RELEASE_REPOSITORY.split("/");
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const release = releases.find((candidate) => candidate.tag_name === process.env.TAG_NAME);
+            const summary = {
+              tag_name: process.env.TAG_NAME,
+              repository: process.env.RELEASE_REPOSITORY,
+              step_outcome: "${{ steps.release.outcome }}",
+              release: release
+                ? {
+                    id: release.id,
+                    draft: release.draft,
+                    asset_names: release.assets.map((asset) => asset.name),
+                    html_url: release.html_url,
+                  }
+                : null,
+            };
+
+            if (release) {
+              core.setOutput("release_id", String(release.id));
+            }
+
+            core.summary
+              .addHeading("Token precedence summary")
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+
+            if (process.env["STEP_OUTCOME"] !== "success") {
+              core.setFailed("explicit token input did not win over GITHUB_TOKEN");
+            }
+
+            if (!release) {
+              core.setFailed(`no release found for ${process.env.TAG_NAME} in ${process.env.RELEASE_REPOSITORY}`);
+            }
+        env:
+          RELEASE_REPOSITORY: ${{ env.RELEASE_REPOSITORY }}
+          STEP_OUTCOME: ${{ steps.release.outcome }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+
+      - name: Cleanup remote draft release
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          RELEASE_ID: ${{ steps.inspect.outputs.release_id }}
+        with:
+          github-token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
+          script: |
+            const [owner, repo] = process.env.RELEASE_REPOSITORY.split("/");
+            if (process.env.RELEASE_ID) {
+              await github.rest.repos.deleteRelease({
+                owner,
+                repo,
+                release_id: Number(process.env.RELEASE_ID),
+              });
+            }
+

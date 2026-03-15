@@ -234,6 +234,9 @@ Planned workflow-to-issue mapping:
 - `.github/workflows/repro-remote-repo.yml` for `#639`, `#308`
 - `.github/workflows/repro-race.yml` plus `.github/workflows/repro-finalize-race.yml` as historical evidence for older duplicate-release/update bugs such as `#571`, `#445`, `#375`, `#215`, and `#140`
 - `.github/workflows/repro-assets-output.yml` as historical evidence for `#222`
+- `.github/workflows/repro-token-precedence.yml` for explicit `GITHUB_TOKEN` vs `token` input precedence (`#639`)
+- `.github/workflows/repro-empty-token.yml` for empty-string token passthrough (`#541`)
+- `.github/workflows/repro-unicode-asset.yml` for Unicode and special-character asset naming collisions (`#542`, likely related to `#393`)
 
 ## Version Recommendation
 

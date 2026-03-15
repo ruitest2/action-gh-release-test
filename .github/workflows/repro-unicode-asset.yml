@@ -1,0 +1,116 @@
+name: repro-unicode-asset
+run-name: repro-unicode-asset-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: master
+
+permissions:
+  contents: write
+
+jobs:
+  repro:
+    runs-on: ubuntu-latest
+    env:
+      TAG_NAME: v542.${{ github.run_id }}.${{ github.run_attempt }}
+      EXPECTED_ASSETS_JSON: '["emoji-🙂.pdf","bracket-[demo].pdf"]'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Prepare unicode assets
+        run: |
+          mkdir -p unicode-assets
+          printf 'emoji asset for %s\n' "${TAG_NAME}" > "unicode-assets/emoji-🙂.pdf"
+          printf 'bracket asset for %s\n' "${TAG_NAME}" > "unicode-assets/bracket-[demo].pdf"
+
+      - name: Attempt release with unicode assets
+        id: release
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Unicode asset repro ${{ env.TAG_NAME }}
+          draft: true
+          files: |
+            unicode-assets/emoji-🙂.pdf
+            unicode-assets/bracket-[demo].pdf
+
+      - name: Summarize unicode asset outcome
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+          EXPECTED_ASSETS_JSON: ${{ env.EXPECTED_ASSETS_JSON }}
+          STEP_OUTCOME: ${{ steps.release.outcome }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const expected = JSON.parse(process.env.EXPECTED_ASSETS_JSON);
+            const { owner, repo } = context.repo;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const release = releases.find((candidate) => candidate.tag_name === process.env.TAG_NAME);
+            const actualAssets = release
+              ? release.assets.map((asset) => asset.label || asset.name).sort()
+              : [];
+
+            const summary = {
+              tag_name: process.env.TAG_NAME,
+              step_outcome: process.env.STEP_OUTCOME,
+              expected_assets: expected.slice().sort(),
+              actual_assets: actualAssets,
+              release_id: release?.id ?? null,
+            };
+
+            core.summary
+              .addHeading("Unicode asset summary")
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+
+            if (!release) {
+              core.setFailed(`no release found for ${process.env.TAG_NAME}`);
+            } else if (process.env.STEP_OUTCOME !== "success") {
+              core.setFailed("unicode asset upload did not complete successfully");
+            } else if (JSON.stringify(actualAssets) !== JSON.stringify(expected.slice().sort())) {
+              core.setFailed("unicode assets were renamed or collapsed");
+            }
+
+      - name: Cleanup draft release
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const release = releases.find((candidate) => candidate.tag_name === process.env.TAG_NAME);
+            if (release) {
+              await github.rest.repos.deleteRelease({
+                owner,
+                repo,
+                release_id: release.id,
+              });
+            }

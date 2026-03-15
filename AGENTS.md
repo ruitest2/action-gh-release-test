@@ -35,6 +35,10 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Use `.github/workflows/repro-brace-glob.yml` for brace/comma glob parsing (`#611`, `#204`).
 - Use `.github/workflows/repro-remote-repo.yml` for remote-repository release creation and asset upload (`#639`, `#308`).
   Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow targets a separate repository and cleans up the test release after inspection.
+- Use `.github/workflows/repro-token-precedence.yml` for remote-repository token precedence (`#639`).
+  Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow intentionally sets `GITHUB_TOKEN` and expects the explicit `token` input to win.
+- Use `.github/workflows/repro-empty-token.yml` for empty-string token handling (`#541`).
+- Use `.github/workflows/repro-unicode-asset.yml` for Unicode and special-character asset naming (`#542`, likely related to `#393`).
 
 ## Done Criteria
 
