@@ -12,6 +12,10 @@ on:
         description: Action ref to test
         required: true
         default: v2.5.0
+      release_repository:
+        description: Repository to publish the release into
+        required: true
+        default: ruitest2/action-gh-release-test
 
 permissions:
   contents: write
@@ -44,8 +48,8 @@ jobs:
           name: Windows repro ${{ env.TAG_NAME }}
           draft: true
           prerelease: true
-          token: ${{ github.token }}
-          repository: ${{ github.repository }}
+          token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN || github.token }}
+          repository: ${{ inputs.release_repository }}
           files: win-asset.txt
 
       - name: Summarize Windows outcome
@@ -54,12 +58,13 @@ jobs:
         env:
           RELEASE_OUTCOME: ${{ steps.release.outcome }}
           TAG_NAME: ${{ env.TAG_NAME }}
+          RELEASE_REPOSITORY: ${{ inputs.release_repository }}
         with:
-          github-token: ${{ github.token }}
+          github-token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN || github.token }}
           script: |
             const releaseOutcome = process.env.RELEASE_OUTCOME;
             const tagName = process.env.TAG_NAME;
-            const { owner, repo } = context.repo;
+            const [owner, repo] = process.env.RELEASE_REPOSITORY.split("/");
             let releaseId = null;
             let releaseUrl = null;
 
@@ -81,6 +86,7 @@ jobs:
               .addHeading("Windows repro summary")
               .addRaw(`Step outcome: ${releaseOutcome}\n`)
               .addRaw(`Tag: ${tagName}\n`)
+              .addRaw(`Repository: ${owner}/${repo}\n`)
               .addRaw(`Release id: ${releaseId ?? "missing"}\n`)
               .addRaw(`Release url: ${releaseUrl ?? "missing"}\n`)
               .write();
