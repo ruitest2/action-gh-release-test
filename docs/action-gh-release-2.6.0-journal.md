@@ -204,6 +204,8 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
   `docs-working-directory-readme`
 - Current upstream ref:
   `e0738d63474019348cc54b6ab16bb09979dc91be`
+- Upstream merge state:
+  merged to `softprops/action-gh-release` `master` as `#761` / `438c15d`
 - Current upstream outcome:
   docs-only contract sync in `README.md` plus wording correction in `action.yml`
 - What the upstream change covers:
@@ -225,7 +227,7 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
 
 - Journal created on 2026-03-15.
 - The renamed-asset concurrent-upload fix is merged on upstream `master`.
-- The `working_directory` docs sync is now implemented on an upstream review branch.
+- The `working_directory` docs sync is merged on upstream `master`.
 - Next active `2.6.0` item:
   add or refresh the `dist/index.js` freshness guard in CI.
 - `dist/index.js` freshness guard and immutable-release verification remain open `2.6.0` research or implementation candidates.
