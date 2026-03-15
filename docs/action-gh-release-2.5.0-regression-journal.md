@@ -116,8 +116,8 @@ That means the next bug-fix round should no longer spend time on the `#704` / `#
 The remaining open bug cluster for the next release is:
 
 - `#741` dotfile asset name regression
-- `#742` Node 24 runtime migration
 - `#740` same-filename concurrent upload race, if we still want explicit hardening beyond the `#705` fix
+- `#742` Node 24 runtime migration if we still want it in the `2.5.2` batch
 
 Fresh `v2.5.1` baselines for the next bug-fix round:
 
@@ -135,10 +135,9 @@ Fresh `v2.5.1` baselines for the next bug-fix round:
 
 Recommended scope for `2.5.2`:
 
-1. Merge PR `#748` for `#708`
-2. Reproduce and fix `#741`
-3. Decide whether `#740` needs explicit hardening beyond the now-green `master` baseline
-4. Keep `#742` as follow-up work unless it naturally fits after the bug fixes
+1. Reproduce and fix `#741`
+2. Decide whether `#740` needs explicit hardening beyond the now-green `master` baseline
+3. Keep `#742` as follow-up work unless it naturally fits after the bug fixes
 
 ## Active Fix Candidates
 
@@ -153,21 +152,20 @@ Recommended scope for `2.5.2`:
     - `asset-4.txt`
   - release id: `297093126`
   - interpretation: `#705` is fixed on current `master`; the next bug-fix round should not reopen that path unless a regression appears
-- PR `#748` `fix: preserve prereleased events for prereleases`
-  - branch under test: `chenrui333/action-gh-release@fix-708-prereleased-event`
+- PR `#748` `fix: preserve prereleased events for prereleases` is merged into `master`
+  - merge target: `https://github.com/softprops/action-gh-release/pull/748`
   - verify: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100224144`
   - tag used: `v708.23100224144.1-rc.1`
   - observed downstream runs:
     - `observe-prereleased`: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100226375`
     - `observe-published`: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100226358`
-  - interpretation: this branch restores the missing `prereleased` event for published prereleases, which is the core `#708` regression
+  - interpretation: `#708` is fixed on current `master`; the next bug-fix round should move to `#741`
 
 ## Next Execution Order
 
-1. Keep PR `#748` as the current `#708` fix candidate and re-run `.github/workflows/trigger-prerelease.yml` if the branch changes
-2. Reproduce and fix `#741`
-3. Revisit `#740` only if we still want an explicit asset-race hardening PR after the now-green `master` baseline
-4. Keep labeling any new bug-fix PR `bug`
+1. Reproduce and fix `#741`
+2. Revisit `#740` only if we still want an explicit asset-race hardening PR after the now-green `master` baseline
+3. Keep labeling any new bug-fix PR `bug`
 
 ## Version Recommendation
 
