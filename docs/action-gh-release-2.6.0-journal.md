@@ -162,9 +162,43 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
 - Reuse existing focused workflows before inventing new harness scenarios.
 - Capture Actions run URLs, tested refs, and release URLs in this journal or its follow-up entries once implementation starts.
 
+## Implementation Progress
+
+### 2026-03-15: renamed-asset concurrent upload fix
+
+- Upstream branch under test:
+  `fix-renamed-asset-race`
+- Final verified upstream ref:
+  `0f4b216be284d9d41b71ff59f6d6577eac540ae8`
+- Final upstream outcome:
+  narrow runtime bug fix plus targeted tests and regenerated `dist/index.js`
+- What the upstream change now covers:
+  - poll release assets briefly after release-asset metadata 404s instead of assuming immediate visibility
+  - treat upload-endpoint 404s that point at the `update-a-release-asset` docs as the same recoverable metadata race
+  - keep the retry scoped to the asset upload path rather than changing unrelated release orchestration
+- Harness coverage added in this repo:
+  - `.github/workflows/repro-duplicate-asset.yml` now accepts `asset_name` and `expected_display_name`
+  - verified both:
+    - `asset_name: shared.txt`
+    - `asset_name: .config`, `expected_display_name: .config`
+- Final regression evidence against `0f4b216be284d9d41b71ff59f6d6577eac540ae8`:
+  - assets output smoke:
+    `https://github.com/ruitest2/action-gh-release-test/actions/runs/23115425264`
+  - dotfile display-name repro:
+    `https://github.com/ruitest2/action-gh-release-test/actions/runs/23115426256`
+  - duplicate asset race, `shared.txt`:
+    `https://github.com/ruitest2/action-gh-release-test/actions/runs/23115427270`
+  - duplicate asset race, `.config`:
+    `https://github.com/ruitest2/action-gh-release-test/actions/runs/23115428432`
+- Intermediate proof during implementation:
+  - `4a75d2e06369f089b20677676584b6f5d7413a97` still failed the plain duplicate-asset race because a post-upload metadata 404 could surface before the matching asset was rediscoverable.
+  - `9cbdf27fcd293e5a8c7c9c178a064ca07d44722b` improved the timing path but still failed because the 404 classifier did not recognize the real upload-endpoint request shape.
+- Remaining platform note:
+  final successful runs still show GitHub-hosted Node 20 deprecation annotations for this action and supporting marketplace actions. That is relevant release-train context, but it is a runtime-upgrade track item rather than part of this bug fix.
+
 ## Current Status
 
 - Journal created on 2026-03-15.
-- No `2.6.0` implementation has been declared done yet.
-- The first concrete implementation candidate is the renamed-asset concurrent-upload cleanup gap.
+- The renamed-asset concurrent-upload fix now has exact-ref harness proof and is ready for maintainer review in the upstream repo.
+- `working_directory` docs sync, `dist/index.js` freshness guard, and immutable-release verification remain open `2.6.0` research or implementation candidates.
 - Active upstream working branch: `fix-renamed-asset-race`.
