@@ -115,24 +115,30 @@ The remaining confirmed race bug is the older shared-tag duplicate-release path 
 That means the next bug-fix round should no longer spend time on the `#704` / `#709` finalize path except as historical regression evidence.
 The remaining open bug cluster for the next release is:
 
-- `#740` same-filename concurrent upload race
-- `#708` prereleased event regression from the draft-first release flow
 - `#741` dotfile asset name regression
 - `#742` Node 24 runtime migration
+- `#740` same-filename concurrent upload race, if we still want explicit hardening beyond the `#705` fix
 
 Fresh `v2.5.1` baselines for the next bug-fix round:
 
-- `#708` is still blocked in this harness on `v2.5.1`
-  - attempt: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23099732384`
-  - outcome: `.github/workflows/trigger-prerelease.yml` failed early because `ACTION_GH_RELEASE_TRIGGER_TOKEN` is not configured in this repo
-  - implication: do not treat `#708` as reproducible or fixed from this harness until that secret exists
+- `#740` did not reproduce on current `master` after `#746`
+  - repro refresh: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100031851`
+  - tag used: `v740.23100031851.1`
+  - outcome: both uploaders succeeded, the release ended with a single `shared.txt`, and the final asset content matched the later finisher
+- `#708` reproduces on current `master` once the harness uses a PAT-backed trigger token
+  - repro: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100150348`
+  - tag used: `v708.23100150348.1-rc.1`
+  - observed downstream runs:
+    - no `observe-prereleased` run
+    - `observe-published`: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100153414`
+  - implication: current `master` still misses the `prereleased` event even though the release is published as a prerelease
 
 Recommended scope for `2.5.2`:
 
-1. Revisit `#740`; it is related to same-tag concurrency, but it is still a separate asset upload race
+1. Merge PR `#748` for `#708`
 2. Reproduce and fix `#741`
-3. Attempt `#708` only if the harness has `ACTION_GH_RELEASE_TRIGGER_TOKEN` configured; otherwise record it as still blocked in this repo
-4. Keep `#741` and `#742` as follow-up work unless they naturally fit after the race fixes
+3. Decide whether `#740` needs explicit hardening beyond the now-green `master` baseline
+4. Keep `#742` as follow-up work unless it naturally fits after the bug fixes
 
 ## Active Fix Candidates
 
@@ -147,12 +153,20 @@ Recommended scope for `2.5.2`:
     - `asset-4.txt`
   - release id: `297093126`
   - interpretation: `#705` is fixed on current `master`; the next bug-fix round should not reopen that path unless a regression appears
+- PR `#748` `fix: preserve prereleased events for prereleases`
+  - branch under test: `chenrui333/action-gh-release@fix-708-prereleased-event`
+  - verify: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100224144`
+  - tag used: `v708.23100224144.1-rc.1`
+  - observed downstream runs:
+    - `observe-prereleased`: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100226375`
+    - `observe-published`: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100226358`
+  - interpretation: this branch restores the missing `prereleased` event for published prereleases, which is the core `#708` regression
 
 ## Next Execution Order
 
-1. Evaluate the next same-tag bug after `#705`, starting with `#740`
-2. Re-run `.github/workflows/repro-duplicate-asset.yml` against the next fix branch
-3. Only attempt `.github/workflows/trigger-prerelease.yml` for `#708` after `ACTION_GH_RELEASE_TRIGGER_TOKEN` exists in this repo
+1. Keep PR `#748` as the current `#708` fix candidate and re-run `.github/workflows/trigger-prerelease.yml` if the branch changes
+2. Reproduce and fix `#741`
+3. Revisit `#740` only if we still want an explicit asset-race hardening PR after the now-green `master` baseline
 4. Keep labeling any new bug-fix PR `bug`
 
 ## Version Recommendation
