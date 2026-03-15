@@ -235,7 +235,7 @@ Planned workflow-to-issue mapping:
 - `.github/workflows/repro-race.yml` plus `.github/workflows/repro-finalize-race.yml` as historical evidence for older duplicate-release/update bugs such as `#571`, `#445`, `#375`, `#215`, and `#140`
 - `.github/workflows/repro-assets-output.yml` as historical evidence for `#222`
 - `.github/workflows/repro-token-precedence.yml` for explicit `GITHUB_TOKEN` vs `token` input precedence (`#639`)
-- `.github/workflows/repro-empty-token.yml` for empty-string token passthrough (`#541`)
+- `.github/workflows/repro-empty-token.yml` for docs/usage confirmation around empty-string token passthrough (`#541`)
 - `.github/workflows/repro-unicode-asset.yml` for Unicode and special-character asset naming collisions (`#542`, likely related to `#393`)
 
 Current `master` sweep results against `softprops/action-gh-release@b25b93d384199fc0fc8c2e126b2d937a0cbeb2ae`:
@@ -246,7 +246,7 @@ Current `master` sweep results against `softprops/action-gh-release@b25b93d38419
 - The simple remote-repository path did not reproduce. `.github/workflows/repro-remote-repo.yml` passed on `23101335895`, so a straightforward `repository` + explicit `token` release still works.
 - `#571` still reproduces on the seeded-draft path. `.github/workflows/repro-finalize-race.yml` failed on `23101359678` because it left five releases for the same tag: one published release with all four assets plus four orphan drafts. The plain concurrent update path in `.github/workflows/repro-race.yml` passed on `23101359675`, so the remaining bug is specifically the finalize/seeded-draft branch rather than the general shared-tag upload path.
 - `#639` still reproduces when both `GITHUB_TOKEN` and an explicit `token` input are present. `.github/workflows/repro-token-precedence.yml` failed on `23101424352` with `Resource not accessible by integration`; the explicit PAT did not win over `GITHUB_TOKEN`.
-- `#541` still reproduces. `.github/workflows/repro-empty-token.yml` failed on `23101424341`, so an empty-string `token` input still does not fall back to the default token path.
+- `#541` still fails if the caller passes `token: ""`, but treat it as a docs/usage case rather than a runtime bug. `.github/workflows/repro-empty-token.yml` failed on `23101424341`, and the refreshed run on current upstream `master` failed again on `23101913008` with `Parameter token or opts.auth is required`; the action cannot recover `${{ github.token }}` after the caller explicitly overrides the input with an empty string.
 - `#542` still reproduces. `.github/workflows/repro-unicode-asset.yml` failed on `23101424357` because the uploaded Unicode/special-character assets were renamed or collapsed instead of remaining distinct.
 
 Initial `2.5.3` bug bucket from this sweep:
@@ -254,16 +254,14 @@ Initial `2.5.3` bug bucket from this sweep:
 - `#645`
 - `#571`
 - `#639`
-- `#541`
 - `#542`
 
 Planned fix order after the `2.5.2` sweep:
 
 1. `#639` token precedence
 2. `#571` seeded finalize/orphan-draft race
-3. `#541` empty-string token passthrough
-4. `#645` preserve-order output and asset ordering
-5. `#542` Unicode and special-character asset naming, with `#393` checked alongside it
+3. `#645` preserve-order output and asset ordering
+4. `#542` Unicode and special-character asset naming, with `#393` checked alongside it
 
 Expected workflow for each fix:
 
@@ -278,14 +276,14 @@ Verification notes:
 - PR `#751` (`chenrui333:token-selection-fix`, head `2654943c5bcc2249ea0a89eee11ac2b55040ddb8`) fixes the explicit-token precedence path for `#639` and has been merged.
   `.github/workflows/repro-token-precedence.yml` passed on `23101560200`, and upstream `build` passed on `23101555026`.
 - PR `#752` clarifies the token precedence docs in `action.yml` and `README.md`; it does not change runtime behavior.
-- `#541` is still open after the `#751` merge.
-  `.github/workflows/repro-empty-token.yml` still failed on `23101560199` with `Parameter token or opts.auth is required`, so the empty-string token case needs its own follow-up.
+- `#541` has been reclassified as documentation rather than a runtime bug.
+  `.github/workflows/repro-empty-token.yml` still failed on `23101560199` and `23101913008`, but the failure is the expected result of explicitly passing `token: ""` and overriding the default `${{ github.token }}` input. `softprops/action-gh-release@ff689a6` updates `README.md` and `action.yml` to call this out, and issue `#541` was relabeled `documentation` and closed.
 - PR `#753` (`chenrui333:finalize-draft-cleanup`, head `668685d61516413a52c2e3c11ed15fd50bb57f14`) folds the duplicate-draft cleanup path into one helper and has been merged as `0a2883678426c2aaf52462d2add978d6072df449`.
   `.github/workflows/repro-finalize-race.yml` passed on `23101838821`; the enabled workers all reported `success`, and tag `v709final.23101838821.1` ended with one published release (`297105698`) containing `finalize-asset-1.txt` through `finalize-asset-4.txt`.
   `.github/workflows/repro-race.yml` also passed on `23101838828` as a non-regression check for `#705`; the enabled workers all reported `success`, and tag `v709.23101838828.1` ended with one published release (`297105765`) containing `asset-1.txt` through `asset-4.txt`.
   Upstream `build` passed on `23101833668`.
-- Active next fix target: `#541`.
-  Re-run `.github/workflows/repro-empty-token.yml` against current upstream `master` before opening the follow-up PR so the journal reflects the post-`#753` baseline.
+- Active next fix target: `#645`.
+  Re-run `.github/workflows/repro-preserve-order.yml` against current upstream `master` before opening the follow-up PR so the journal reflects the post-`#753` baseline.
 
 ## Version Recommendation
 
