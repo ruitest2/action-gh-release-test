@@ -198,12 +198,34 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
 - Remaining platform note:
   final successful runs still show GitHub-hosted Node 20 deprecation annotations for this action and supporting marketplace actions. That is relevant release-train context, but it is a runtime-upgrade track item rather than part of this bug fix.
 
+### 2026-03-15: `working_directory` contract sync
+
+- Upstream branch under test:
+  `docs-working-directory-readme`
+- Current upstream ref:
+  `e0738d63474019348cc54b6ab16bb09979dc91be`
+- Current upstream outcome:
+  docs-only contract sync in `README.md` plus wording correction in `action.yml`
+- What the upstream change covers:
+  - add the missing `working_directory` entry to the README inputs table
+  - add a short usage example showing `files` patterns relative to `working_directory`
+  - clarify that the action resolves `files` from the workspace root when `working_directory` is omitted
+  - align `action.yml` wording with current GitHub Actions behavior instead of implying `run` step `working-directory` semantics
+- Verification performed:
+  - `npm run fmtcheck`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm test`
+- External regression coverage:
+  not run for this item because the branch is docs-only and does not change runtime behavior
+- GitHub-platform note validated during docs review:
+  GitHub's `defaults.run.working-directory` setting applies to `run` steps, so this action's own `working_directory` input remains the correct way to resolve release asset globs under a subdirectory for a `uses:` step.
+
 ## Current Status
 
 - Journal created on 2026-03-15.
 - The renamed-asset concurrent-upload fix is merged on upstream `master`.
+- The `working_directory` docs sync is now implemented on an upstream review branch.
 - Next active `2.6.0` item:
-  sync the public README contract for `working_directory`.
-- `working_directory` docs sync, `dist/index.js` freshness guard, and immutable-release verification remain open `2.6.0` research or implementation candidates.
-- Expected next upstream shape:
-  docs-only change unless current source review finds additional contract drift.
+  add or refresh the `dist/index.js` freshness guard in CI.
+- `dist/index.js` freshness guard and immutable-release verification remain open `2.6.0` research or implementation candidates.
