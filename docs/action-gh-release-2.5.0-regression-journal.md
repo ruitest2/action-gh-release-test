@@ -113,9 +113,12 @@ The remaining confirmed race bug is the older shared-tag duplicate-release path 
 - closed after release: `#703`, `#704`, `#709`
 
 That means the next bug-fix round should no longer spend time on the `#704` / `#709` finalize path except as historical regression evidence.
-The remaining open bug cluster tied to the recent 2.5.x regressions is:
+The recent 2.5.x regression cluster is merged into current `master`.
 
-- `#740` same-filename concurrent upload race, if we still want explicit hardening beyond the `#705` fix
+The next open bug-fix candidates are:
+
+- `#729` Windows x64 remote-repository release lookup failure
+- `#722` orphaned draft release when tag creation is blocked by repo rules
 
 Fresh `v2.5.1` baselines for the next bug-fix round:
 
@@ -141,11 +144,11 @@ Fresh `v2.5.1` baselines for the next bug-fix round:
   - outcome: the workflow failed when the expected displayed name was `.config`
   - observed asset record: raw name `default.config`, empty label
 
-Recommended scope for `2.5.2`:
+Recommended scope for the next bug-fix pass:
 
-1. Merge the verified `#740` fix candidate
-2. Keep `.github/workflows/repro-duplicate-asset.yml` as the regression guard for the same-filename race
-3. Revisit older non-runtime bugs only after the 2.5.0-era regression cluster is exhausted
+1. Keep `.github/workflows/repro-duplicate-asset.yml` as the regression guard for `#740`
+2. Reproduce `#729` and `#722` on current `master`
+3. Prepare the next fix PR from whichever of `#729` and `#722` is confirmed and tractable first
 
 ## Active Fix Candidates
 
@@ -176,7 +179,7 @@ Recommended scope for `2.5.2`:
     - raw name: `default.config`
     - label: `.config`
   - interpretation: current `master` restores the displayed dotfile name while preserving GitHub's normalized raw asset name
-- PR `#745` `fix: handle upload already_exists races across workflows`
+- PR `#745` `fix: handle upload already_exists races across workflows` is merged into `master`
   - merge target: `https://github.com/softprops/action-gh-release/pull/745`
   - upstream build: `https://github.com/softprops/action-gh-release/actions/runs/23100595292`
   - verify: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23100613403`
@@ -187,13 +190,14 @@ Recommended scope for `2.5.2`:
   - resulting release state: `https://github.com/ruitest2/action-gh-release-test/releases/tag/v740.23100613403.1`
   - observed release asset list:
     - `shared.txt`
-  - interpretation: the rebased `#745` branch fixes the same-filename concurrent upload race on top of the `#746` canonicalization changes
+  - interpretation: current `master` fixes the same-filename concurrent upload race on top of the `#746` canonicalization changes
 
 ## Next Execution Order
 
 1. Keep `.github/workflows/repro-dotfile.yml` as the fixed regression guard for `#741`
-2. Merge `#745` for `#740`
-3. Keep labeling any new bug-fix PR `bug`
+2. Keep `.github/workflows/repro-duplicate-asset.yml` as the fixed regression guard for `#740`
+3. Reproduce `#729` and `#722`
+4. Keep labeling any new bug-fix PR `bug`
 
 ## Version Recommendation
 
