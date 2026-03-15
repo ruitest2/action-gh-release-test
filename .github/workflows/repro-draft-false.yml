@@ -46,7 +46,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           files: draft-false.txt
 
-      - name: Assert release was published, not drafted
+      - name: Assert release was published with the uploaded asset
         if: always()
         uses: actions/github-script@v7
         env:
@@ -74,8 +74,15 @@ jobs:
               .addCodeBlock(JSON.stringify(summary, null, 2), "json")
               .write();
 
-            if (release.draft || !release.prerelease) {
-              core.setFailed("release did not stay published with draft=false");
+            if (
+              stepOutcome !== "success" ||
+              release.draft ||
+              !release.prerelease ||
+              !release.assets.some((asset) => asset.name === "draft-false.txt")
+            ) {
+              core.setFailed(
+                "release did not finish as a published prerelease with the uploaded asset",
+              );
             }
 
       - name: Cleanup release and tag

@@ -46,6 +46,7 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Use `.github/workflows/repro-existing-draft.yml` for existing-draft reuse and draft-state behavior (`#163`, PR `#245`).
   Pass `draft_mode: keep` to verify the release stays draft, or `draft_mode: publish` to verify the seeded draft is reused and then published when `draft` is omitted.
 - Use `.github/workflows/repro-draft-false.yml` for `draft: false` behavior when creating prereleases outside a tag-triggered job (`#253`, `#379`).
+  For immutable-release verification (`#641`), enable immutable releases on this repo before dispatching `repro-draft-false.yml` and `repro-existing-draft.yml`, then disable them again if you need mutable-only checks. The local maintainer toggle is `gh api -H 'X-GitHub-Api-Version: 2022-11-28' -X PUT repos/ruitest2/action-gh-release-test/immutable-releases` to enable and the matching `-X DELETE` call to disable.
 - Use `.github/workflows/repro-omit-name.yml` for omitted-name update behavior against an existing tagged release (`#363`).
 - Use `.github/workflows/repro-existing-release-ref-tag.yml` for `tag_name: refs/tags/...` update behavior (`#403`).
 - Use `.github/workflows/repro-home-tilde.yml` for home-directory path expansion (`#368`).
