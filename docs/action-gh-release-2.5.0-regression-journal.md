@@ -259,10 +259,11 @@ Initial `2.5.3` bug bucket from this sweep:
 
 Planned fix order after the `2.5.2` sweep:
 
-1. `#639` + `#541` together in token selection/parsing
+1. `#639` token precedence
 2. `#571` seeded finalize/orphan-draft race
-3. `#645` preserve-order output and asset ordering
-4. `#542` Unicode and special-character asset naming, with `#393` checked alongside it
+3. `#541` empty-string token passthrough
+4. `#645` preserve-order output and asset ordering
+5. `#542` Unicode and special-character asset naming, with `#393` checked alongside it
 
 Expected workflow for each fix:
 
@@ -274,10 +275,12 @@ Expected workflow for each fix:
 
 Verification notes:
 
-- Draft PR `#751` (`chenrui333:token-selection-fix`, head `2654943c5bcc2249ea0a89eee11ac2b55040ddb8`) fixes the explicit-token precedence path for `#639`.
+- PR `#751` (`chenrui333:token-selection-fix`, head `2654943c5bcc2249ea0a89eee11ac2b55040ddb8`) fixes the explicit-token precedence path for `#639` and has been merged.
   `.github/workflows/repro-token-precedence.yml` passed on `23101560200`, and upstream `build` passed on `23101555026`.
-- The same PR does not fully fix `#541`.
-  `.github/workflows/repro-empty-token.yml` still failed on `23101560199` with `Parameter token or opts.auth is required`, so `#541` stays open for a separate follow-up unless the intended contract is narrowed to cases where `GITHUB_TOKEN` is explicitly present in the environment.
+- `#541` is still open after the `#751` merge.
+  `.github/workflows/repro-empty-token.yml` still failed on `23101560199` with `Parameter token or opts.auth is required`, so the empty-string token case needs its own follow-up.
+- Active next fix target: `#571`.
+  Use `.github/workflows/repro-finalize-race.yml` against the PR head and require the seeded-draft path to end with exactly one release for the tag and no orphan drafts.
 
 ## Version Recommendation
 
