@@ -9,6 +9,7 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - When testing a specific upstream PR or commit, pin `.github/workflows/e2e.yml` to the exact `softprops/action-gh-release` ref under test instead of relying on `master`.
 - Prefer disposable branches and unique tags for each regression run so the resulting workflow runs and releases are easy to trace.
 - Keep `test-assets/` stable unless a regression case explicitly requires different fixtures.
+- When referring to upstream `softprops/action-gh-release` issues or PRs in this repo's docs, comments, or commit messages, wrap them in backticks like ``#112`` so GitHub does not auto-link them to this test repo's own issue namespace.
 - Do not turn this into a general development repo; it is a harness for validating upstream `action-gh-release` changes.
 
 ## Regression Workflow Map
