@@ -420,3 +420,8 @@ Progress update:
 - `.github/workflows/repro-target-commitish.yml` was tightened to target a recent non-workflow commit and then rerun on current `master` in `23103170201`.
 - That rerun still hit `403 Resource not accessible by integration`, and the direct `git.createRef` diagnostic also failed with the same permission boundary for the same target SHA.
 - Current evidence points to `#411` being a `github.token` permission limit for older-commit tag creation rather than an action-side bug, so it belongs in docs guidance instead of the current bug-fix queue.
+
+Fresh open-bug confirmation against `softprops/action-gh-release@e8dbf3cc4acd14f07940596db0aae3fcb67517a8`:
+
+- `#222` still does not reproduce on current `master`. `.github/workflows/repro-assets-output.yml` passed on `23103319080` with a tagged `browser_download_url` under `/releases/download/<tag>/...`, and `.github/workflows/repro-assets-output-windows.yml` passed on `23103319044` with a non-empty `steps.release.outputs.assets` array on Windows.
+- `#163` still does not reproduce on current `master`. `.github/workflows/repro-existing-draft.yml` passed on `23103319053`; that harness only passes if the seeded draft release is the single matching release, keeps the same release ID, stays draft, and contains the uploaded `draft-asset.txt`.
