@@ -170,6 +170,8 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
   `fix-renamed-asset-race`
 - Final verified upstream ref:
   `0f4b216be284d9d41b71ff59f6d6577eac540ae8`
+- Upstream merge state:
+  merged to `softprops/action-gh-release` `master` as `#760` / `6ca3b5d`
 - Final upstream outcome:
   narrow runtime bug fix plus targeted tests and regenerated `dist/index.js`
 - What the upstream change now covers:
@@ -199,6 +201,9 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
 ## Current Status
 
 - Journal created on 2026-03-15.
-- The renamed-asset concurrent-upload fix now has exact-ref harness proof and is ready for maintainer review in the upstream repo.
+- The renamed-asset concurrent-upload fix is merged on upstream `master`.
+- Next active `2.6.0` item:
+  sync the public README contract for `working_directory`.
 - `working_directory` docs sync, `dist/index.js` freshness guard, and immutable-release verification remain open `2.6.0` research or implementation candidates.
-- Active upstream working branch: `fix-renamed-asset-race`.
+- Expected next upstream shape:
+  docs-only change unless current source review finds additional contract drift.
