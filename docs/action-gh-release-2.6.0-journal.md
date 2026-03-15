@@ -54,7 +54,7 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
 - Suggested `2.6.0` handling:
   Treat as a real bug-fix candidate. Reuse the same logical match rules in the race retry path that the ordinary overwrite path already uses.
 - Proposed regression coverage:
-  Add a targeted unit test in the upstream repo and extend `.github/workflows/repro-duplicate-asset.yml` or add a close sibling workflow that uses a renamed asset fixture such as `.config`.
+  Add a targeted unit test in the upstream repo and extend `.github/workflows/repro-duplicate-asset.yml` so it can run against a renamed asset fixture such as `.config`.
 
 ### 3. Immutable-release validation is not settled for prereleases
 
@@ -89,7 +89,9 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
   Concurrent uploads of assets whose raw names are GitHub-normalized should recover the same way plain filenames do when `overwrite_files` remains enabled.
 - Proposed regression coverage:
   - Upstream unit tests around `upload()`
-  - Harness validation using the duplicate-upload path with a renamed asset fixture
+  - Harness validation using `.github/workflows/repro-duplicate-asset.yml` twice:
+    - baseline `asset_name: shared.txt`
+    - renamed-asset case `asset_name: .config`, `expected_display_name: .config`
 - Current status:
   Best independent bug-fix candidate found from current source review.
 
@@ -165,3 +167,4 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
 - Journal created on 2026-03-15.
 - No `2.6.0` implementation has been declared done yet.
 - The first concrete implementation candidate is the renamed-asset concurrent-upload cleanup gap.
+- Active upstream working branch: `fix-renamed-asset-race`.

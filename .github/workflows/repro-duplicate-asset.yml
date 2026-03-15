@@ -12,6 +12,14 @@ on:
         description: Action ref to test
         required: true
         default: v2.5.0
+      asset_name:
+        description: Asset filename to upload concurrently
+        required: true
+        default: shared.txt
+      expected_display_name:
+        description: Expected displayed asset name after upload
+        required: true
+        default: shared.txt
 
 permissions:
   contents: write
@@ -46,8 +54,10 @@ jobs:
           path: action-under-test
 
       - name: Prepare shared asset
+        env:
+          ASSET_NAME: ${{ inputs.asset_name }}
         run: |
-          printf 'shared asset from worker %s for %s\n' "${{ matrix.slot }}" "${{ needs.prepare.outputs.tag_name }}" > shared.txt
+          printf 'shared asset from worker %s for %s\n' "${{ matrix.slot }}" "${{ needs.prepare.outputs.tag_name }}" > "$ASSET_NAME"
 
       - name: Wait for barrier
         env:
@@ -64,7 +74,7 @@ jobs:
         with:
           tag_name: ${{ needs.prepare.outputs.tag_name }}
           name: Duplicate asset repro ${{ needs.prepare.outputs.tag_name }}
-          files: shared.txt
+          files: ${{ inputs.asset_name }}
 
       - name: Persist worker outcome
         if: always()
@@ -101,6 +111,7 @@ jobs:
       - name: Summarize duplicate asset attempt
         uses: actions/github-script@v7
         env:
+          EXPECTED_DISPLAY_NAME: ${{ inputs.expected_display_name }}
           TAG_NAME: ${{ needs.prepare.outputs.tag_name }}
         with:
           github-token: ${{ github.token }}
@@ -121,10 +132,14 @@ jobs:
               repo,
               tag: tagName,
             });
+            const displayedAssetNames = release.assets.map((asset) => asset.label || asset.name);
+            const expectedDisplayName = process.env.EXPECTED_DISPLAY_NAME;
+            const allSucceeded = uploaderResults.every((result) => result.outcome === "success");
 
             const summary = {
               tag_name: tagName,
               uploader_results: uploaderResults,
+              displayed_asset_names: displayedAssetNames,
               asset_names: release.assets.map((asset) => asset.name),
             };
 
@@ -132,3 +147,17 @@ jobs:
               .addHeading("Duplicate asset summary")
               .addCodeBlock(JSON.stringify(summary, null, 2), "json")
               .write();
+
+            if (!allSucceeded) {
+              core.setFailed("expected both concurrent uploaders to succeed");
+              return;
+            }
+
+            if (release.assets.length !== 1) {
+              core.setFailed(`expected exactly one release asset, found ${release.assets.length}`);
+              return;
+            }
+
+            if (!displayedAssetNames.includes(expectedDisplayName)) {
+              core.setFailed(`expected displayed asset ${expectedDisplayName}`);
+            }
