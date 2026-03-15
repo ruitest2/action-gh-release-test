@@ -57,6 +57,25 @@ jobs:
         run: |
           printf 'target commitish repro %s\n' "$TAG_NAME" > target-commitish.txt
 
+      - name: Check direct ref creation against target commitish
+        id: direct-ref
+        continue-on-error: true
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+          TARGET_COMMITISH: ${{ steps.previous.outputs.sha }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const ref = `refs/tags/direct-${process.env.TAG_NAME}`;
+            await github.rest.git.createRef({
+              owner,
+              repo,
+              ref,
+              sha: process.env.TARGET_COMMITISH,
+            });
+
       - name: Attempt release with non-latest commitish
         id: release
         continue-on-error: true
@@ -72,6 +91,7 @@ jobs:
         env:
           TAG_NAME: ${{ env.TAG_NAME }}
           TARGET_COMMITISH: ${{ steps.previous.outputs.sha }}
+          DIRECT_REF_OUTCOME: ${{ steps.direct-ref.outcome }}
           RELEASE_OUTCOME: ${{ steps.release.outcome }}
         with:
           github-token: ${{ github.token }}
@@ -94,6 +114,7 @@ jobs:
             const summary = {
               tag_name: process.env.TAG_NAME,
               target_commitish: process.env.TARGET_COMMITISH,
+              direct_ref_outcome: process.env.DIRECT_REF_OUTCOME,
               step_outcome: process.env.RELEASE_OUTCOME,
               release_id: release?.id ?? null,
               release_target_commitish: release?.target_commitish ?? null,
@@ -137,6 +158,20 @@ jobs:
               });
             } catch (error) {
               if (error.status !== 404) {
+                throw error;
+              }
+            }
+            try {
+              await github.request("DELETE /repos/{owner}/{repo}/git/refs/{ref}", {
+                owner,
+                repo,
+                ref: `tags/direct-${process.env.TAG_NAME}`,
+              });
+            } catch (error) {
+              if (
+                error.status !== 404 &&
+                !(error.status === 422 && /Reference does not exist/i.test(error.message))
+              ) {
                 throw error;
               }
             }
