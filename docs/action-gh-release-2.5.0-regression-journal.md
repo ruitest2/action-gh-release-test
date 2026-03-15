@@ -495,3 +495,5 @@ Progress update:
   That run confirmed current `master` reuses the same seeded draft release and publishes it after upload when the `draft` input is omitted.
 - Current result: the original behavior target of PR `#245` is already covered by current `master`, so there is no remaining upstream feature gap to rebase.
 - The only follow-up worth considering is a small docs clarification in upstream `README.md` / `action.yml` so users understand the keep-vs-publish behavior for reused draft releases.
+- That docs follow-up is PR `#759` (`docs: clarify reused draft release behavior`).
+  Upstream build passed on `23104115532`, and the PR is ready for final human review instead of reviving the stale feature branch.
