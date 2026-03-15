@@ -46,6 +46,8 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
   Do not keep `#542` in the active bug-fix bucket unless the workflow shows an action-level defect beyond GitHub's own filename normalization and label limits.
 - When doing historical bug sweeps, separate issues into three buckets in the journal: confirmed non-repro on current upstream, confirmed docs/usage or platform limitations, and still-open cases that need a bespoke repro.
   Only keep the third bucket as active runtime bugs.
+- If a historical issue cannot be reproduced or isolated on current upstream after a reasonable sweep, close it upstream with a short stale/non-repro note instead of carrying it forward as an active bug.
+  Reserve the active release bucket for confirmed current defects and any docs clarifications that current testing still justifies.
 
 ## Done Criteria
 

@@ -324,3 +324,9 @@ Short notes for the remaining bucket:
 - `#573` may be repo-configuration specific because current upstream only sends `discussion_category_name` when the input is actually set.
 - The large-upload and network-family issues (`#637`, `#612`, `#549`, `#536`, `#499`, `#482`, `#243`, `#239`, `#166`, `#156`) still need purpose-built stress repros; this sweep did not generate enough signal to close them.
 - The body-length and release-notes issues (`#374`, `#191`, `#471`) need targeted repros because the current sweep only covered append/update behavior, not very large generated bodies.
+
+Broad historical closeout applied after this sweep:
+
+- The remaining issues from that bespoke-repro bucket were closed upstream with a standard current-code note when they still could not be reproduced or isolated on current `master` / `2.5.2`.
+- That closeout covered `#251`, `#280`, `#311`, `#363`, `#368`, `#373`, `#374`, `#379`, `#393`, `#403`, `#411`, `#414`, `#434`, `#471`, `#482`, `#499`, `#536`, `#549`, `#573`, `#587`, `#612`, `#614`, `#637`, `#110`, `#139`, `#156`, `#166`, `#191`, `#194`, `#210`, `#221`, `#227`, `#228`, `#239`, `#243`, `#308`, and `#335`.
+- Going forward, `2.5.3` should focus on confirmed current runtime fixes plus documentation clarifications for reports that turn out to be usage or platform-limit cases, rather than carrying old non-repro issues indefinitely.
