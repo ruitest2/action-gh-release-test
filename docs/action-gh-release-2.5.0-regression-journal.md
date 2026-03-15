@@ -83,6 +83,25 @@ For the currently relevant PRs:
 4. Revisit the older shared-tag race in `#705` and likely handle `#740` with the same work
 5. Keep `#725` queued; it is a real fix but lower urgency because this harness cannot hit the 10k-release condition
 
+## Current Master State
+
+As of 2026-03-14, the following fix PRs are merged into `softprops/action-gh-release/master`:
+
+- `#738` `fix: fetch correct asset URL after finalization; test; some refactoring`
+- `#715` `fix: release marked as 'latest' despite make_latest: false`
+- `#725` `fix: use getReleaseByTag API instead of iterating all releases`
+
+That leaves the `#704` / `#709` race path as the primary remaining blocker for `2.5.1`.
+
+## Next Execution Order
+
+1. Re-run `.github/workflows/repro-race.yml` against current `softprops/action-gh-release/master`
+2. Confirm whether the current `master` still reproduces `#704` / `#709`
+3. Build the fix in `softprops/action-gh-release` on a new PR branch
+4. Re-run `.github/workflows/repro-race.yml` and `.github/workflows/repro-duplicate-asset.yml` against that fix branch
+5. Label the fix PR `bug`
+6. Cut `2.5.1` only after the race repro is fixed or intentionally deferred
+
 ## Version Recommendation
 
 If the next release only contains the regression fixes and related test/docs work, use `2.5.1`.
