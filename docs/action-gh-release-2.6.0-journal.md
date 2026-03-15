@@ -290,6 +290,46 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
   the immutable failure-mode run now surfaces:
   `Cannot upload asset draft-false.txt to an immutable release. GitHub only allows asset uploads before a release is published, but draft prereleases publish with the release.published event instead of release.prereleased.`
 
+### 2026-03-15: harness audit follow-up
+
+- Harness outcome:
+  keep released upstream `v2.6.0` as the default baseline for future bug-fix and feature validation runs, while still overriding to an exact upstream ref when a specific branch, PR, or commit is under test.
+- What changed in this repo:
+  - `.github/workflows/e2e.yml` now pins the simple push smoke to `softprops/action-gh-release@v2.6.0`
+  - all `workflow_dispatch` repro workflows now default `action_ref` to `v2.6.0`
+  - `.github/workflows/repro-home-tilde.yml` is now the consolidated path-resolution verifier:
+    - `path_case: home-tilde` for `~/...`
+    - `path_case: working-directory` for end-to-end `working_directory`
+  - `.github/workflows/repro-assets-output.yml` now verifies the full Linux outputs contract:
+    - `outputs.assets`
+    - `outputs.url`
+    - `outputs.id`
+    - `outputs.upload_url`
+  - `actionlint` cleanup landed for the race-workflow numeric guards and the `previous_tag` comparison-commit output step
+  - `AGENTS.md` and `TESTS.md` now document:
+    - the `v2.6.0` default baseline
+    - the consolidated path-resolution workflow role
+    - the narrower Windows asset-output role
+    - the maintainer decision to retain historical test tags, releases, and uploaded assets as evidence
+- Local validation:
+  - `actionlint` passed after the workflow changes
+  - `yamllint -d relaxed` on the changed workflow files returned line-length warnings only
+- Regression evidence against exact upstream ref `v2.6.0`:
+  - full Linux outputs contract:
+    - run: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23116803229`
+    - tag: `v713.23116803229.11`
+  - path resolution, `path_case: home-tilde`:
+    - run: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23116803228`
+    - tag: `vpath.23116803228.1`
+  - path resolution, `path_case: working-directory`:
+    - run: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23116803247`
+    - tag: `vpath.23116803247.1`
+  - race smoke after the guard-script cleanup:
+    - run: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23116803350`
+    - tag: `v709.23116803350.1`
+- Notable platform note from the verification runs:
+  GitHub still emits Node 20 deprecation annotations for `actions/checkout@v4`, `actions/upload-artifact@v4`, and the upstream action under test during these runs. That is useful release-train context, but it is not a harness defect and should stay separate from harness-only maintenance.
+
 ## Current Status
 
 - Journal created on 2026-03-15.
