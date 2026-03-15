@@ -70,6 +70,7 @@ jobs:
               step_outcome: process.env.RELEASE_OUTCOME,
               assets: assetSummaries,
             };
+            console.log(JSON.stringify(summary));
 
             core.summary
               .addHeading("Paren asset summary")

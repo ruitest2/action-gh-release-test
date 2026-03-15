@@ -83,6 +83,7 @@ jobs:
               release_target_commitish: release?.target_commitish ?? null,
               asset_names: release?.assets.map((asset) => asset.name) ?? [],
             };
+            console.log(JSON.stringify(summary));
 
             core.summary
               .addHeading("Target commitish summary")
@@ -130,7 +131,10 @@ jobs:
                 ref: `tags/${process.env.TAG_NAME}`,
               });
             } catch (error) {
-              if (error.status !== 404) {
+              if (
+                error.status !== 404 &&
+                !(error.status === 422 && /Reference does not exist/i.test(error.message))
+              ) {
                 throw error;
               }
             }

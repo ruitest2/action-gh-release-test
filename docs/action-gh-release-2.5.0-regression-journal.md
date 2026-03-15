@@ -361,3 +361,28 @@ Current repro-first note:
 
 - Do not reopen or re-close historical issues based only on past comments.
 - Capture a fresh current run first, then decide whether the issue belongs in the active bug bucket, the docs/platform bucket, or the non-repro bucket.
+
+Current results against `softprops/action-gh-release@26c9a934b1010109e8457032a1227a8f0cd71c32`:
+
+- `#163` no longer reproduces. `.github/workflows/repro-existing-draft.yml` passed on `23102772294`; the seeded draft release was reused cleanly and the duplicate-draft cleanup path no longer leaves extra releases behind.
+- `#222` no longer reproduces. `.github/workflows/repro-assets-output.yml` passed on `23102657907`, and `.github/workflows/repro-assets-output-windows.yml` passed on `23102659187`.
+- `#253` / `#379` no longer reproduce in the current `draft: false` harness. `.github/workflows/repro-draft-false.yml` passed on `23102661297`.
+- `#363` no longer reproduces in the omitted-name harness. `.github/workflows/repro-omit-name.yml` passed on `23102662361`.
+- `#335` no longer reproduces in the large asset-count harness. `.github/workflows/repro-many-files.yml` passed on `23102666876`.
+- `#374` / `#471` did not reproduce in the current large-body harness. `.github/workflows/repro-body-too-long.yml` passed on `23102665647`.
+- `#434` no longer reproduces in the DexMetadata-style asset harness. `.github/workflows/repro-dm-asset.yml` passed on `23102772299`; both `app-release.apk` and `app-release.dm` uploaded cleanly.
+- `#368` still reproduces. `.github/workflows/repro-home-tilde.yml` failed on `23102772297`; the action logged `Pattern '~/home-asset.txt' does not match any files` and the release was created without the home-directory asset.
+- `#403` still reproduces. `.github/workflows/repro-existing-release-ref-tag.yml` failed on `23102772302`; `tag_name: refs/tags/...` caused the action to create a second release for the prefixed tag, then hit `Validation Failed` / `already_exists` during finalization instead of reusing the seeded release.
+- `#393` still reproduces. `.github/workflows/repro-paren-asset.yml` failed on `23102772298`; the action restored the asset label, but the raw asset name used for the download remained normalized, so the original parentheses filename was not preserved end to end.
+- `#280`, `#614`, and `#311` still reproduce. `.github/workflows/repro-windows-glob.yml` failed on `23102772296`; Windows-style backslash globs logged `Pattern '.\\release-assets\\rssguard-*win7.exe' does not match any files` and no assets were uploaded.
+- `#411` still reproduces. `.github/workflows/repro-target-commitish.yml` failed on `23102772301`; creating a release against the previous commit SHA returned `403 Resource not accessible by integration` instead of creating the release at the requested `target_commitish`.
+
+Current reopen-candidate list from this pass:
+
+- `#368`
+- `#393`
+- `#403`
+- `#411`
+- `#280`
+- `#614`
+- `#311`
