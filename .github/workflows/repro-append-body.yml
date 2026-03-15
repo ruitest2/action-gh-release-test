@@ -1,0 +1,121 @@
+name: repro-append-body
+run-name: repro-append-body-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: master
+
+permissions:
+  contents: write
+
+jobs:
+  repro:
+    runs-on: ubuntu-latest
+    env:
+      TAG_NAME: v613.${{ github.run_id }}.${{ github.run_attempt }}
+      BASE_BODY: "seed body"
+      EXTRA_BODY: "extra body from append"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Seed existing release
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+          BASE_BODY: ${{ env.BASE_BODY }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            await github.rest.repos.createRelease({
+              owner,
+              repo,
+              tag_name: process.env.TAG_NAME,
+              name: `Append body repro ${process.env.TAG_NAME}`,
+              body: process.env.BASE_BODY,
+              draft: false,
+            });
+
+      - name: Attempt append_body update
+        id: release
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Append body repro ${{ env.TAG_NAME }}
+          append_body: true
+          body: ${{ env.EXTRA_BODY }}
+
+      - name: Summarize append_body outcome
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+          BASE_BODY: ${{ env.BASE_BODY }}
+          EXTRA_BODY: ${{ env.EXTRA_BODY }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner,
+              repo,
+              tag: process.env.TAG_NAME,
+            });
+            const body = release.body || "";
+            const summary = {
+              tag_name: process.env.TAG_NAME,
+              step_outcome: process.env.RELEASE_OUTCOME,
+              contains_base_body: body.includes(process.env.BASE_BODY),
+              contains_extra_body: body.includes(process.env.EXTRA_BODY),
+              body,
+            };
+
+            core.summary
+              .addHeading("append_body summary")
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+
+            if (!body.includes(process.env.BASE_BODY) || !body.includes(process.env.EXTRA_BODY)) {
+              core.setFailed("release body did not contain both seed and appended content");
+            }
+
+      - name: Cleanup release and tag
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner,
+              repo,
+              tag: process.env.TAG_NAME,
+            });
+            await github.rest.repos.deleteRelease({
+              owner,
+              repo,
+              release_id: release.id,
+            });
+            await github.request("DELETE /repos/{owner}/{repo}/git/refs/{ref}", {
+              owner,
+              repo,
+              ref: `tags/${process.env.TAG_NAME}`,
+            });

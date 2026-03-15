@@ -1,0 +1,115 @@
+name: repro-preserve-order
+run-name: repro-preserve-order-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: master
+
+permissions:
+  contents: write
+
+jobs:
+  repro:
+    runs-on: ubuntu-latest
+    env:
+      TAG_NAME: v645.${{ github.run_id }}.${{ github.run_attempt }}
+      EXPECTED_ORDER_JSON: '["z-last.txt","a-first.txt","m-middle.txt"]'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Prepare ordered assets
+        run: |
+          mkdir -p preserve-order
+          printf 'z file for %s\n' "${TAG_NAME}" > preserve-order/z-last.txt
+          printf 'a file for %s\n' "${TAG_NAME}" > preserve-order/a-first.txt
+          printf 'm file for %s\n' "${TAG_NAME}" > preserve-order/m-middle.txt
+
+      - name: Attempt release
+        id: release
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Preserve order repro ${{ env.TAG_NAME }}
+          draft: true
+          preserve_order: true
+          files: |
+            preserve-order/z-last.txt
+            preserve-order/a-first.txt
+            preserve-order/m-middle.txt
+
+      - name: Summarize preserve_order outcome
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+          EXPECTED_ORDER_JSON: ${{ env.EXPECTED_ORDER_JSON }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const expectedOrder = JSON.parse(process.env.EXPECTED_ORDER_JSON);
+            const { owner, repo } = context.repo;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const release = releases.find((candidate) => candidate.tag_name === process.env.TAG_NAME);
+            const actualOrder = release ? release.assets.map((asset) => asset.name) : [];
+
+            const summary = {
+              tag_name: process.env.TAG_NAME,
+              step_outcome: process.env.RELEASE_OUTCOME,
+              expected_order: expectedOrder,
+              actual_order: actualOrder,
+              release_id: release?.id ?? null,
+            };
+
+            core.summary
+              .addHeading("Preserve order summary")
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+
+            if (!release) {
+              core.setFailed(`no release found for ${process.env.TAG_NAME}`);
+            } else if (JSON.stringify(actualOrder) !== JSON.stringify(expectedOrder)) {
+              core.setFailed("asset order did not match input order");
+            }
+
+      - name: Cleanup draft release
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const release = releases.find((candidate) => candidate.tag_name === process.env.TAG_NAME);
+            if (release) {
+              await github.rest.repos.deleteRelease({
+                owner,
+                repo,
+                release_id: release.id,
+              });
+            }

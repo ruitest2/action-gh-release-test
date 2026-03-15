@@ -1,0 +1,107 @@
+name: repro-brace-glob
+run-name: repro-brace-glob-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: master
+
+permissions:
+  contents: write
+
+jobs:
+  repro:
+    runs-on: ubuntu-latest
+    env:
+      TAG_NAME: v611.${{ github.run_id }}.${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Prepare glob assets
+        run: |
+          mkdir -p glob-assets
+          printf 'alpha\n' > glob-assets/alpha.txt
+          printf 'beta\n' > glob-assets/beta.md
+          printf 'gamma\n' > glob-assets/gamma.bin
+
+      - name: Attempt brace glob release
+        id: release
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Brace glob repro ${{ env.TAG_NAME }}
+          draft: true
+          fail_on_unmatched_files: true
+          files: glob-assets/*.{txt,md}
+
+      - name: Summarize brace glob outcome
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const release = releases.find((candidate) => candidate.tag_name === process.env.TAG_NAME);
+            const assetNames = release ? release.assets.map((asset) => asset.name).sort() : [];
+            const summary = {
+              tag_name: process.env.TAG_NAME,
+              step_outcome: process.env.RELEASE_OUTCOME,
+              asset_names: assetNames,
+            };
+
+            core.summary
+              .addHeading("Brace glob summary")
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+
+            const expected = JSON.stringify(["alpha.txt", "beta.md"]);
+            if (!release) {
+              core.setFailed(`no release found for ${process.env.TAG_NAME}`);
+            } else if (JSON.stringify(assetNames) !== expected) {
+              core.setFailed("brace glob did not upload the expected files");
+            }
+
+      - name: Cleanup draft release
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const release = releases.find((candidate) => candidate.tag_name === process.env.TAG_NAME);
+            if (release) {
+              await github.rest.repos.deleteRelease({
+                owner,
+                repo,
+                release_id: release.id,
+              });
+            }

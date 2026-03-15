@@ -221,6 +221,20 @@ Recommended scope for the next bug-fix pass:
 3. Keep `.github/workflows/repro-blocked-tag.yml` as the active repro for `#722`
 4. Keep labeling any new bug-fix PR `bug`
 
+## 2.5.3 Candidate Sweep
+
+The next historical bug sweep should use this repo to separate still-reproducible issues from issues that are already covered by shipped fixes.
+If a case still reproduces on current `master`, keep it in the `2.5.3` bucket. If it does not reproduce, record the evidence and leave it out of the bucket.
+
+Planned workflow-to-issue mapping:
+
+- `.github/workflows/repro-preserve-order.yml` for `#645`
+- `.github/workflows/repro-append-body.yml` for `#613`, `#216`, `#238`
+- `.github/workflows/repro-brace-glob.yml` for `#611`, `#204` and likely related unmatched-pattern parsing reports such as `#614` and `#280`
+- `.github/workflows/repro-remote-repo.yml` for `#639`, `#308`
+- `.github/workflows/repro-race.yml` plus `.github/workflows/repro-finalize-race.yml` as historical evidence for older duplicate-release/update bugs such as `#571`, `#445`, `#375`, `#215`, and `#140`
+- `.github/workflows/repro-assets-output.yml` as historical evidence for `#222`
+
 ## Version Recommendation
 
 If the next release only contains the remaining regression fixes and related test/docs work, use `2.5.2`.
