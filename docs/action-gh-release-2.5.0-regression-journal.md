@@ -277,6 +277,7 @@ Verification notes:
 
 - PR `#751` (`chenrui333:token-selection-fix`, head `2654943c5bcc2249ea0a89eee11ac2b55040ddb8`) fixes the explicit-token precedence path for `#639` and has been merged.
   `.github/workflows/repro-token-precedence.yml` passed on `23101560200`, and upstream `build` passed on `23101555026`.
+- PR `#752` clarifies the token precedence docs in `action.yml` and `README.md`; it does not change runtime behavior.
 - `#541` is still open after the `#751` merge.
   `.github/workflows/repro-empty-token.yml` still failed on `23101560199` with `Parameter token or opts.auth is required`, so the empty-string token case needs its own follow-up.
 - Active next fix target: `#571`.
@@ -284,6 +285,6 @@ Verification notes:
 
 ## Version Recommendation
 
-If the next release only contains the remaining regression fixes and related test/docs work, use `2.5.2`.
+If the next release only contains the remaining regression fixes and related test/docs work, use `2.5.3`.
 
 Use `2.6.0` only if the release intentionally includes new feature work such as `#732` or other additive behavior beyond the current bug-fix batch.
