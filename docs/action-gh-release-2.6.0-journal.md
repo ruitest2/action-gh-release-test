@@ -354,6 +354,57 @@ This journal starts the `2.6.0` release-train backlog and is intentionally indep
   - the harness-owned Node 20 deprecation annotations from `actions/checkout`, `actions/upload-artifact`, and `actions/download-artifact` are gone
   - the remaining Node 20 deprecation annotation is only for `./action-under-test`, which is upstream runtime behavior and must be handled in `softprops/action-gh-release`, not in this harness
 
+### 2026-03-15: smoke, observer-evidence, and remote-cleanup follow-up
+
+- Follow-up reason:
+  the first harness audit left three maintainability items open:
+  - `e2e.yml` still needed an exact-ref smoke path
+  - the remote-repo workflows only deleted release objects, not tags
+  - `trigger-prerelease.yml` and `e2e.yml` needed stronger summary evidence
+- What changed in this repo:
+  - `.github/workflows/e2e.yml` now supports both:
+    - tag-push smoke on released upstream `v2.6.0`
+    - `workflow_dispatch` exact-ref smoke using a checked-out `action-under-test`
+  - `e2e.yml` now records:
+    - workflow run URL
+    - release URL
+    - uploaded asset names
+  - `.github/workflows/trigger-prerelease.yml` now records:
+    - workflow run URL
+    - created prerelease URL
+    - observer workflow run URLs for both `observe-prereleased` and `observe-published`
+  - `.github/workflows/repro-remote-repo.yml` and `.github/workflows/repro-token-precedence.yml` now delete the matching remote tag after deleting the remote release
+  - `scripts/release-harness.js` now includes a reusable `deleteTagIfExists()` helper for remote cleanup
+  - `AGENTS.md` and `TESTS.md` now describe the dual-mode `e2e` workflow and the stronger remote-cleanup/evidence expectations
+- Local validation:
+  - `actionlint` passed after the workflow changes
+- Regression evidence against exact upstream ref `v2.6.0`:
+  - exact-ref `e2e` smoke:
+    - run: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23117074958`
+    - tag: `ve2e.23117074958.1`
+    - release: `https://github.com/ruitest2/action-gh-release-test/releases/tag/ve2e.23117074958.1`
+  - remote repository smoke:
+    - run: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23117074930`
+    - tag cleaned: `v639.23117074930.1`
+  - token precedence remote smoke:
+    - run: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23117074957`
+    - tag cleaned: `v639token.23117074957.1`
+  - prerelease observer evidence:
+    - trigger run: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23117074941`
+    - prerelease tag: `v708.23117074941.1-rc.1`
+    - prerelease release URL: `https://github.com/ruitest2/action-gh-release-test/releases/tag/v708.23117074941.1-rc.1`
+    - `observe-prereleased`: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23117077299`
+    - `observe-published`: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23117077333`
+- Remote cleanup proof:
+  - after the remote-repo workflow completed, both:
+    - the remote release for `v639.23117074930.1`
+    - the remote tag `refs/tags/v639.23117074930.1`
+    were absent in `chenrui333/action-gh-release`
+  - after the token-precedence workflow completed, both:
+    - the remote release for `v639token.23117074957.1`
+    - the remote tag `refs/tags/v639token.23117074957.1`
+    were absent in `chenrui333/action-gh-release`
+
 ## Current Status
 
 - Journal created on 2026-03-15.
