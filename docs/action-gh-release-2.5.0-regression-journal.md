@@ -415,4 +415,6 @@ Progress update:
 - The rebased PR head `413200b` passed `.github/workflows/repro-existing-release-ref-tag.yml` in run `23103004409`, and upstream run `23103004159` was green before merge.
 - `#756` merged on upstream `master` as `37f7a20` and fixed `~/...` file-path expansion for `#368`.
 - PR head `88e03fa` passed `.github/workflows/repro-home-tilde.yml` in run `23103057838`, and upstream run `23103058361` was green before merge.
-- The active next fix is `#393`, using `.github/workflows/repro-paren-asset.yml` as the verifier.
+- PR `#757` attempted to restore the original raw asset name after upload for `#393`, but `.github/workflows/repro-paren-asset.yml` still failed in run `23103104859`.
+- That run showed GitHub kept the raw asset name normalized as `appName.x64._1.0.0.1.msi` while preserving only the label `appName(x64)_1.0.0.1.msi`, so this looks like the same platform-limit behavior reported in `#159`.
+- The active next fix is `#411`, using `.github/workflows/repro-target-commitish.yml` as the verifier.
