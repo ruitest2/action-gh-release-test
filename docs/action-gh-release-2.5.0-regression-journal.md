@@ -425,3 +425,22 @@ Fresh open-bug confirmation against `softprops/action-gh-release@e8dbf3cc4acd14f
 
 - `#222` still does not reproduce on current `master`. `.github/workflows/repro-assets-output.yml` passed on `23103319080` with a tagged `browser_download_url` under `/releases/download/<tag>/...`, and `.github/workflows/repro-assets-output-windows.yml` passed on `23103319044` with a non-empty `steps.release.outputs.assets` array on Windows.
 - `#163` still does not reproduce on current `master`. `.github/workflows/repro-existing-draft.yml` passed on `23103319053`; that harness only passes if the seeded draft release is the single matching release, keeps the same release ID, stays draft, and contains the uploaded `draft-asset.txt`.
+
+Post-fix verification pass against the earlier broad-closeout bucket on `softprops/action-gh-release@e8dbf3cc4acd14f07940596db0aae3fcb67517a8`:
+
+- `#280`, `#614`, and `#311` stay fixed on current `master`. `.github/workflows/repro-windows-glob.yml` passed on `23103476267`, confirming the merged Windows glob normalization path still matches and uploads the expected assets.
+- `#368` stays fixed on current `master`. `.github/workflows/repro-home-tilde.yml` passed on `23103476349`, so `~/...` paths still expand and upload cleanly.
+- `#403` stays fixed on current `master`. `.github/workflows/repro-existing-release-ref-tag.yml` passed on `23103476261`, so `tag_name: refs/tags/...` still normalizes and reuses the existing release instead of creating a duplicate.
+- `#363` stays fixed on current `master`. `.github/workflows/repro-omit-name.yml` passed on `23103476260`, so omitting `name` no longer creates a second release in the current harness.
+- `#379` stays fixed on current `master`. `.github/workflows/repro-draft-false.yml` passed on `23103476271`, so the historical `draft: false` behavior is still clean in the current harness.
+- `#374` and `#471` still do not reproduce. `.github/workflows/repro-body-too-long.yml` passed on `23103476263`.
+- `#335` still does not reproduce. `.github/workflows/repro-many-files.yml` passed on `23103476264`.
+- `#434` still does not reproduce. `.github/workflows/repro-dm-asset.yml` passed on `23103476262`.
+- `#411` no longer reproduces with the refined harness. `.github/workflows/repro-target-commitish.yml` passed on `23103476270`; the direct `git.createRef` diagnostic succeeded, the action created release `297116714`, and the final summary showed `direct_ref_outcome: "success"`, `step_outcome: "success"`, and `release_target_commitish` equal to the requested prior commit SHA `1c97fc9165c14bc99513248cf8e99840129af1a1`.
+- `#393` still reproduces in the current harness, but the failure remains consistent with GitHub's raw asset-name normalization rather than an action-side runtime bug. `.github/workflows/repro-paren-asset.yml` failed on `23103476269` after the action restored the label `appName(x64)_1.0.0.1.msi`; GitHub still stored the raw asset name as `appName.x64._1.0.0.1.msi`.
+
+Current reopen guidance from this pass:
+
+- Do not reopen the fixed runtime cases above; the latest `master` runs stayed green.
+- Do not reopen `#411`; the refined harness is now green on current `master`.
+- `#393` is still reproducible, but it remains a docs/platform-limit case unless new evidence shows GitHub now allows the raw release-asset download name to be preserved.
