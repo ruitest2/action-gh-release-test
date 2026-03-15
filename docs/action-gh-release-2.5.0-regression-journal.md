@@ -290,3 +290,37 @@ Verification notes:
 If the next release only contains the remaining regression fixes and related test/docs work, use `2.5.3`.
 
 Use `2.6.0` only if the release intentionally includes new feature work such as `#732` or other additive behavior beyond the current bug-fix batch.
+
+## Post-`2.5.2` Historical Sweep
+
+Current upstream under test: `softprops/action-gh-release@26c9a934b1010109e8457032a1227a8f0cd71c32`
+
+This sweep focuses on older open bug reports and keeps only current action-level defects in the active bucket.
+If a case is clearly stale, docs-only, or no longer reproducible on current upstream, close it upstream and keep it out of the runtime-fix plan.
+
+Confirmed non-repro on current upstream:
+
+- `#222` no longer reproduces. `.github/workflows/repro-assets-output.yml` was still defaulting to the old broken `untagged` expectation, so run `23102298537` failed only because current `master` now emits tagged `browser_download_url` values under `/releases/download/<tag>/...`. The workflow default should stay on `tagged` for future guard runs.
+- The append-body update path still works. `.github/workflows/repro-append-body.yml` passed on `23102301445`, so the existing-release body update path did not reproduce the older failures in `#613`, `#216`, and `#238`.
+- The straightforward remote-repository create/upload path still works. `.github/workflows/repro-remote-repo.yml` passed on `23102301469`, created release `297108413` in `chenrui333/action-gh-release`, uploaded `remote-repo.txt`, and finalized successfully. Treat that as non-repro evidence for the simple path behind `#308`.
+- The older shared-tag duplicate-release path still does not reproduce. `.github/workflows/repro-race.yml` passed on `23102298535`, which is consistent with the earlier fixed runs for `#705`, `#140`, `#146`, `#215`, and `#375`.
+- The basic Windows create/upload path still works. `.github/workflows/repro-windows.yml` passed on `23102298540`, so there is no current regression in the simple Windows release path covered by that harness.
+
+Confirmed stale or docs/usage-only cases:
+
+- `#137` is stale usage. Current releases targeting another repository should use the documented `repository` input, not `GITHUB_REPOSITORY`.
+- `#265` is stale. Current code uses `@actions/core.setOutput(...)`; there is no `::set-output` command left in `master`.
+- `#299` is stale. The current repository no longer depends on `json5`, so the reported advisory does not apply to current `master`.
+- `#367` is stale. Current `action.yml` exposes the `token` input, and current releases accept it.
+
+Still-open cases that need a bespoke repro before closing or fixing:
+
+- `#251`, `#280`, `#311`, `#363`, `#368`, `#373`, `#374`, `#379`, `#393`, `#403`, `#411`, `#414`, `#434`, `#471`, `#482`, `#499`, `#536`, `#549`, `#573`, `#587`, `#612`, `#614`, `#637`
+- `#110`, `#139`, `#156`, `#166`, `#191`, `#194`, `#210`, `#221`, `#227`, `#228`, `#239`, `#243`, `#308`, `#335`
+
+Short notes for the remaining bucket:
+
+- `#587` is vague enough that it needs a concrete current repro or failing log before it can be classified.
+- `#573` may be repo-configuration specific because current upstream only sends `discussion_category_name` when the input is actually set.
+- The large-upload and network-family issues (`#637`, `#612`, `#549`, `#536`, `#499`, `#482`, `#243`, `#239`, `#166`, `#156`) still need purpose-built stress repros; this sweep did not generate enough signal to close them.
+- The body-length and release-notes issues (`#374`, `#191`, `#471`) need targeted repros because the current sweep only covered append/update behavior, not very large generated bodies.

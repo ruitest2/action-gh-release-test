@@ -19,7 +19,7 @@ on:
         options:
           - tagged
           - untagged
-        default: untagged
+        default: tagged
 
 permissions:
   contents: write

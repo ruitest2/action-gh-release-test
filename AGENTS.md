@@ -20,8 +20,9 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
   After `v2.5.1`, treat that journal as the running plan for the next bug-fix round as well; it records which regressions were fixed in `2.5.1` and which open bugs remain.
 - Keep the default `e2e.yml` for simple tag-based smoke testing of release creation and asset upload.
 - Use `.github/workflows/repro-make-latest.yml` for the `make_latest: false` regression and fix verification (`#703`, PR `#715`).
-- Use `.github/workflows/repro-assets-output.yml` for invalid `assets` output URLs and fix verification (`#713`, PR `#738`).
-- Use `.github/workflows/repro-race.yml` for concurrent same-tag creation races (`#705`) and related duplicate-release checks.
+- Use `.github/workflows/repro-assets-output.yml` for invalid `assets` output URLs and fix verification (`#713`, `#222`, PR `#738`).
+  Current fixed versions should emit tagged release-asset URLs, so keep the workflow default on `expected_url_kind: tagged` unless you are intentionally reproducing the old broken behavior.
+- Use `.github/workflows/repro-race.yml` for concurrent same-tag creation races (`#705`) and related duplicate-release checks such as `#140`, `#146`, `#215`, and `#375`.
 - Use `.github/workflows/repro-finalize-race.yml` for the draft-finalization retry path (`#704`, `#709`).
   Re-run both against current upstream `master` before opening a race-fix PR so the journal reflects which race still reproduces after the latest merged fixes.
 - Use `.github/workflows/trigger-prerelease.yml` together with `.github/workflows/observe-prereleased.yml` and `.github/workflows/observe-published.yml` for prerelease event behavior (`#708`).
@@ -43,6 +44,8 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
   Do not keep `#541` in the active bug-fix bucket unless the workflow shows a distinct runtime defect beyond the documented `token: ""` semantics.
 - Use `.github/workflows/repro-unicode-asset.yml` only to confirm docs/usage behavior for Unicode and special-character asset naming (`#542`, likely related to `#393`).
   Do not keep `#542` in the active bug-fix bucket unless the workflow shows an action-level defect beyond GitHub's own filename normalization and label limits.
+- When doing historical bug sweeps, separate issues into three buckets in the journal: confirmed non-repro on current upstream, confirmed docs/usage or platform limitations, and still-open cases that need a bespoke repro.
+  Only keep the third bucket as active runtime bugs.
 
 ## Done Criteria
 
