@@ -1,0 +1,116 @@
+name: repro-release-discussion
+run-name: >-
+  repro-release-discussion-${{ inputs.action_ref }}-${{ inputs.expected_discussion }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: v2.6.0
+      expected_discussion:
+        description: Whether the created release is expected to have a linked discussion
+        required: true
+        type: choice
+        options:
+          - present
+          - absent
+        default: absent
+
+permissions:
+  contents: write
+  discussions: write
+
+jobs:
+  repro:
+    runs-on: ubuntu-latest
+    env:
+      TAG_NAME: v764.${{ github.run_id }}.${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Prepare release files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          printf 'discussion repro asset %s\n' "$TAG_NAME" > release-assets/discussion.txt
+          cat > release-notes.md <<EOF
+          Discussion repro for $TAG_NAME
+          EOF
+
+      - name: Create release with discussion category
+        id: release
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Discussion repro ${{ env.TAG_NAME }}
+          discussion_category_name: Announcements
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          files: release-assets/*
+
+      - name: Assert linked discussion behavior
+        uses: actions/github-script@v8
+        env:
+          EXPECTED_DISCUSSION: ${{ inputs.expected_discussion }}
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+          RELEASE_URL: ${{ steps.release.outputs.url }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const {
+              getReleaseByTagOrNull,
+              writeJsonSummary,
+            } = require(`${process.env.GITHUB_WORKSPACE}/scripts/release-harness.js`);
+            const { owner, repo } = context.repo;
+            const tagName = process.env.TAG_NAME;
+            const release = await getReleaseByTagOrNull({ github, owner, repo, tag: tagName });
+            const expected = process.env.EXPECTED_DISCUSSION;
+            const discussionPresent = Boolean(release?.discussion_url);
+
+            await writeJsonSummary(core, "Discussion repro summary", {
+              tag_name: tagName,
+              action_ref: "${{ inputs.action_ref }}",
+              expected_discussion: expected,
+              step_outcome: process.env.RELEASE_OUTCOME,
+              output_release_url: process.env.RELEASE_URL,
+              observed_release_id: release?.id ?? null,
+              observed_release_url: release?.html_url ?? null,
+              observed_discussion_url: release?.discussion_url ?? null,
+              asset_names: release?.assets.map((asset) => asset.name) ?? [],
+            });
+
+            if (process.env.RELEASE_OUTCOME !== "success") {
+              core.setFailed("action did not create the release successfully");
+              return;
+            }
+
+            if (!release) {
+              core.setFailed(`no release found for ${tagName}`);
+              return;
+            }
+
+            if (expected === "present" && !discussionPresent) {
+              core.setFailed("expected a linked discussion, but release.discussion_url was empty");
+              return;
+            }
+
+            if (expected === "absent" && discussionPresent) {
+              core.setFailed(
+                `expected no linked discussion, but found ${release.discussion_url}`,
+              );
+            }
