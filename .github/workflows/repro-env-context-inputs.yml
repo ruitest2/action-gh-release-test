@@ -1,0 +1,138 @@
+name: repro-env-context-inputs
+run-name: repro-env-context-inputs-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+        default: v2.6.0
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - id: version
+        shell: bash
+        run: echo "version=1.0.0" >> "$GITHUB_OUTPUT"
+
+  repro:
+    runs-on: ubuntu-latest
+    needs: prepare
+    permissions:
+      contents: write
+    env:
+      TAG_NAME: v766.${{ github.run_id }}.${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Populate runtime env through GITHUB_ENV
+        shell: bash
+        run: echo "VERSION=${{ needs.prepare.outputs.version }}" >> "$GITHUB_ENV"
+
+      - name: Assert runtime env is populated
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$VERSION" = "1.0.0"
+
+      - name: Resolve env context inside another action input
+        id: control_env
+        uses: actions/github-script@v8
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        with:
+          script: |
+            core.setOutput("resolved", "${{ env.VERSION }}")
+
+      - name: Resolve needs output directly inside another action input
+        id: control_needs
+        uses: actions/github-script@v8
+        with:
+          script: |
+            core.setOutput("resolved", "${{ needs.prepare.outputs.version }}")
+
+      - name: Create release with env-context inputs
+        id: release
+        uses: ./action-under-test
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: ${{ env.VERSION }}
+          body: Version ${{ env.VERSION }} of the ecommerce application.
+          draft: false
+          generate_release_notes: true
+          prerelease: false
+
+      - name: Assert observed release metadata
+        uses: actions/github-script@v8
+        env:
+          CONTROL_ENV_RESOLVED: ${{ steps.control_env.outputs.resolved }}
+          CONTROL_NEEDS_RESOLVED: ${{ steps.control_needs.outputs.resolved }}
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+          RELEASE_URL: ${{ steps.release.outputs.url }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner,
+              repo,
+              tag: process.env.TAG_NAME,
+            });
+
+            const summary = {
+              tag_name: process.env.TAG_NAME,
+              runtime_env_version: "1.0.0",
+              control_env_resolved: process.env.CONTROL_ENV_RESOLVED,
+              control_needs_resolved: process.env.CONTROL_NEEDS_RESOLVED,
+              release_outcome: process.env.RELEASE_OUTCOME,
+              output_release_url: process.env.RELEASE_URL,
+              observed_release_name: release.name,
+              observed_release_body_prefix: release.body?.split("\n")[0] ?? null,
+              observed_release_url: release.html_url,
+            };
+
+            core.summary
+              .addHeading("Env context repro summary")
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+
+            if (process.env.RELEASE_OUTCOME !== "success") {
+              core.setFailed("release step did not succeed");
+              return;
+            }
+
+            if (process.env.CONTROL_ENV_RESOLVED !== "") {
+              core.setFailed("env context inside action inputs did not reproduce as empty");
+              return;
+            }
+
+            if (process.env.CONTROL_NEEDS_RESOLVED !== "1.0.0") {
+              core.setFailed("direct needs output did not resolve as expected");
+              return;
+            }
+
+            if (release.name !== process.env.TAG_NAME) {
+              core.setFailed(`expected release name fallback to ${process.env.TAG_NAME}`);
+              return;
+            }
+
+            if (!release.body?.startsWith("Version  of the ecommerce application.")) {
+              core.setFailed("release body did not reproduce the empty env-context substitution");
+            }
