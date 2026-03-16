@@ -134,3 +134,13 @@ This journal starts the `2.6.1` bug-fix train and is intentionally focused on on
   - all `workflow_dispatch` repro workflows now default `action_ref` to `v2.6.1`
   - `AGENTS.md` and `TESTS.md` now describe `v2.6.1` as the default released baseline
 - Historical evidence for `v2.6.0` remains in this journal because it is still the comparison point for the `#764` regression.
+- Post-bump verification against released upstream `v2.6.1`:
+  - `e2e.yml` exact-ref smoke:
+    - run: `23129054927`
+    - run URL: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23129054927`
+    - release: `https://github.com/ruitest2/action-gh-release-test/releases/tag/ve2e.23129054927.1`
+  - `repro-release-discussion.yml`:
+    - run: `23129054949`
+    - run URL: `https://github.com/ruitest2/action-gh-release-test/actions/runs/23129054949`
+    - release: `https://github.com/ruitest2/action-gh-release-test/releases/tag/v764.23129054949.1`
+    - discussion: `https://github.com/ruitest2/action-gh-release-test/discussions/5`
