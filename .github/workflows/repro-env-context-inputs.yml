@@ -1,5 +1,5 @@
 name: repro-env-context-inputs
-run-name: repro-env-context-inputs-${{ inputs.action_ref || 'v2.6.0' }}
+run-name: repro-env-context-inputs-${{ inputs.action_ref || 'v2.6.1' }}
 
 on:
   push:
@@ -14,7 +14,7 @@ on:
       action_ref:
         description: Action ref to test
         required: true
-        default: v2.6.0
+        default: v2.6.1
 
 jobs:
   prepare:
@@ -39,7 +39,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: ${{ inputs.action_repository || 'softprops/action-gh-release' }}
-          ref: ${{ inputs.action_ref || 'v2.6.0' }}
+          ref: ${{ inputs.action_ref || 'v2.6.1' }}
           path: action-under-test
 
       - name: Populate runtime env through GITHUB_ENV
@@ -121,8 +121,8 @@ jobs:
               return;
             }
 
-            if (process.env.CONTROL_ENV_RESOLVED !== "") {
-              core.setFailed("env context inside action inputs did not reproduce as empty");
+            if (process.env.CONTROL_ENV_RESOLVED !== "1.0.0") {
+              core.setFailed("env context inside action inputs did not resolve to 1.0.0");
               return;
             }
 
@@ -131,11 +131,11 @@ jobs:
               return;
             }
 
-            if (release.name !== process.env.TAG_NAME) {
-              core.setFailed(`expected release name fallback to ${process.env.TAG_NAME}`);
+            if (release.name !== "1.0.0") {
+              core.setFailed(`expected release name 1.0.0, got ${release.name}`);
               return;
             }
 
-            if (!release.body?.startsWith("Version  of the ecommerce application.")) {
-              core.setFailed("release body did not reproduce the empty env-context substitution");
+            if (!release.body?.startsWith("Version 1.0.0 of the ecommerce application.")) {
+              core.setFailed("release body did not preserve the env-context substitution");
             }
