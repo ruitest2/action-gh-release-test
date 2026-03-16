@@ -11,7 +11,7 @@ on:
       action_ref:
         description: Action ref to test
         required: true
-        default: v2.6.0
+        default: v2.6.1
       expected_url_kind:
         description: Expected output URL shape
         required: true

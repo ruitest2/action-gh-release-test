@@ -7,7 +7,7 @@ that verify them.
 ## How To Use This Matrix
 
 - Run workflows from `main` and pass the exact upstream `action_repository` and `action_ref` under test.
-- Treat released upstream `v2.6.0` as the default baseline for the matrix unless you are intentionally validating a newer exact ref.
+- Treat released upstream `v2.6.1` as the default baseline for the matrix unless you are intentionally validating a newer exact ref.
 - Prefer the smallest workflow that directly proves the behavior you changed.
 - Update this file when a user-facing behavior gets a new regression workflow or when an existing workflow's responsibility changes.
 - Keep issue-level workflow notes in `AGENTS.md`; keep the major scenario inventory here.
@@ -17,7 +17,7 @@ that verify them.
 
 | Scenario | Primary workflow(s) | Notes |
 | --- | --- | --- |
-| Basic tag-triggered release creation and asset upload | [.github/workflows/e2e.yml](.github/workflows/e2e.yml) | Dual-mode smoke. Tag pushes verify the default released-baseline path on `v2.6.0`; `workflow_dispatch` verifies an exact upstream ref through a checked-out `action-under-test` copy without editing the workflow. |
+| Basic tag-triggered release creation and asset upload | [.github/workflows/e2e.yml](.github/workflows/e2e.yml) | Dual-mode smoke. Tag pushes verify the default released-baseline path on `v2.6.1`; `workflow_dispatch` verifies an exact upstream ref through a checked-out `action-under-test` copy without editing the workflow. |
 | Release-linked discussion creation | [.github/workflows/repro-release-discussion.yml](.github/workflows/repro-release-discussion.yml) | Primary verifier for `discussion_category_name`. This repo keeps Discussions enabled with the default `Announcements` category so exact-ref runs can compare historical-good, released-broken, and fix-under-test behavior. |
 | Existing release update by tag | [.github/workflows/repro-append-body.yml](.github/workflows/repro-append-body.yml), [.github/workflows/repro-omit-name.yml](.github/workflows/repro-omit-name.yml), [.github/workflows/repro-existing-release-ref-tag.yml](.github/workflows/repro-existing-release-ref-tag.yml) | Covers update-in-place behavior, omitted fields, and `tag_name: refs/tags/...` normalization. |
 | Existing draft reuse and finalization | [.github/workflows/repro-existing-draft.yml](.github/workflows/repro-existing-draft.yml) | Run with `draft_mode: keep` to keep the seeded draft and `draft_mode: publish` to publish it after upload. |

@@ -7,10 +7,10 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 
 - Keep the workflow intentionally small and focused on end-to-end release behavior.
 - Keep [TESTS.md](TESTS.md) current as the major user-facing regression matrix. Update it whenever a new workflow becomes the primary verifier for a feature surface or release path.
-- Keep `v2.6.0` as the default released baseline in workflow inputs unless a newer released baseline intentionally replaces it.
+- Keep `v2.6.1` as the default released baseline in workflow inputs unless a newer released baseline intentionally replaces it.
 - When testing a specific upstream PR or commit, override the workflow `action_ref` with the exact `softprops/action-gh-release` ref under test.
   `e2e.yml` now supports both:
-  - tag-push smoke on released `v2.6.0`
+  - tag-push smoke on released `v2.6.1`
   - `workflow_dispatch` exact-ref smoke via checked-out `action-under-test`
 - Prefer disposable branches and unique tags for each regression run so the resulting workflow runs and releases are easy to trace.
 - Do not remove existing historical test tags, releases, or uploaded assets from this repo unless the user explicitly asks for cleanup. They are part of the external evidence set.
@@ -21,18 +21,18 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 ## Regression Workflow Map
 
 - Use `workflow_dispatch` on `main` and pass the exact upstream `action_repository` and `action_ref` under test.
-  Unless you are testing a newer exact ref, the workflow defaults should stay on released upstream `v2.6.0`.
+  Unless you are testing a newer exact ref, the workflow defaults should stay on released upstream `v2.6.1`.
 - If the upstream changes only exist locally in `$HOME/softprops/action-gh-release`, push them to a branch or fork first; this repo's workflows check out a remote ref.
 - Start with `docs/action-gh-release-2.5.0-regression-journal.md` when you need the current evidence set, merge order, or known harness limitations for the 2.5.0 bug cluster.
   After `v2.5.1`, treat that journal as the running plan for the next bug-fix round as well; it records which regressions were fixed in `2.5.1` and which open bugs remain.
-- Keep the default `e2e.yml` for simple smoke testing of release creation and asset upload on released upstream `v2.6.0`.
+- Keep the default `e2e.yml` for simple smoke testing of release creation and asset upload on released upstream `v2.6.1`.
   Use tag pushes for the default released-baseline path and `workflow_dispatch` when you need an exact upstream ref without editing the workflow.
 - Use `.github/workflows/repro-make-latest.yml` for the `make_latest: false` regression and fix verification (`#703`, PR `#715`).
 - Use `.github/workflows/repro-assets-output.yml` for invalid `assets` output URLs and fix verification (`#713`, `#222`, PR `#738`).
   It is the primary Linux verifier for the release outputs contract: `assets`, `url`, `id`, and `upload_url`. Keep the workflow default on `expected_url_kind: tagged` unless you are intentionally reproducing the old broken behavior.
 - Use `.github/workflows/repro-race.yml` for concurrent same-tag creation races (`#705`) and related duplicate-release checks such as `#140`, `#146`, `#215`, and `#375`.
 - Use `.github/workflows/repro-finalize-race.yml` for the draft-finalization retry path (`#704`, `#709`).
-  Re-run both against released upstream `v2.6.0` or the exact upstream ref under test before opening a race-fix PR so the journal reflects which race still reproduces after the latest merged fixes.
+  Re-run both against released upstream `v2.6.1` or the exact upstream ref under test before opening a race-fix PR so the journal reflects which race still reproduces after the latest merged fixes.
 - Use `.github/workflows/trigger-prerelease.yml` together with `.github/workflows/observe-prereleased.yml` and `.github/workflows/observe-published.yml` for prerelease event behavior (`#708`).
   Configure an `ACTION_GH_RELEASE_TRIGGER_TOKEN` repo secret first; release workflows triggered with the default `GITHUB_TOKEN` are suppressed by GitHub and will not exercise the observer workflows.
   The summary now records the created release URL plus observer workflow run URLs so the run evidence is easier to reuse in journals and upstream reports.

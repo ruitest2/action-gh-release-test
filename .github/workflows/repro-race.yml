@@ -11,7 +11,7 @@ on:
       action_ref:
         description: Action ref to test
         required: true
-        default: v2.6.0
+        default: v2.6.1
       worker_count:
         description: Number of parallel workers to start at the same barrier
         required: true

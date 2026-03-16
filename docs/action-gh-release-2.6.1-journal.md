@@ -125,3 +125,12 @@ This journal starts the `2.6.1` bug-fix train and is intentionally focused on on
   unit coverage around `finalizeRelease` and `GitHubReleaser.finalizeRelease`
 - README / `action.yml` expectation:
   no contract-doc change needed if the fix only restores the documented existing behavior
+
+## Baseline Update
+
+- On 2026-03-16, after `softprops/action-gh-release` released `v2.6.1`, this harness moved its default released baseline from `v2.6.0` to `v2.6.1`.
+- Operational changes:
+  - `.github/workflows/e2e.yml` now pins the simple tag-push smoke to `softprops/action-gh-release@v2.6.1`
+  - all `workflow_dispatch` repro workflows now default `action_ref` to `v2.6.1`
+  - `AGENTS.md` and `TESTS.md` now describe `v2.6.1` as the default released baseline
+- Historical evidence for `v2.6.0` remains in this journal because it is still the comparison point for the `#764` regression.

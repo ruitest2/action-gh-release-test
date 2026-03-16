@@ -12,7 +12,7 @@ on:
       action_ref:
         description: Action ref to test
         required: true
-        default: v2.6.0
+        default: v2.6.1
       expected_discussion:
         description: Whether the created release is expected to have a linked discussion
         required: true
