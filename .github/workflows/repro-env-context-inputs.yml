@@ -2,6 +2,9 @@ name: repro-env-context-inputs
 run-name: repro-env-context-inputs-${{ inputs.action_ref }}
 
 on:
+  push:
+    branches:
+      - tmp-repro-766
   workflow_dispatch:
     inputs:
       action_repository:
