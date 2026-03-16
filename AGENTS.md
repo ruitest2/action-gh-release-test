@@ -45,6 +45,12 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Use `.github/workflows/repro-preserve-order.yml` only to confirm docs/usage behavior for `preserve_order` (`#645`).
   Do not keep `#645` in the active bug-fix bucket unless the workflow shows an action-level ordering defect rather than GitHub's own release-asset ordering.
 - Use `.github/workflows/repro-append-body.yml` for existing-release update and `append_body` behavior (`#613`, `#216`, `#238`).
+- Use `.github/workflows/repro-release-discussion.yml` for release-linked discussion creation (`#764`).
+  This repo now has Discussions enabled with the default `Announcements` category, and the workflow requires `discussions: write`.
+  Keep the comparison pattern explicit when triaging regressions:
+  - `v2.4.2` should create a linked discussion
+  - `v2.6.0` should reproduce the missing-discussion bug
+  - the exact upstream fix ref under test should create the linked discussion again
 - Use `.github/workflows/repro-assets-output-windows.yml` for Windows `outputs.assets` checks (`#222`).
 - Use `.github/workflows/repro-home-tilde.yml` for consolidated path-resolution verification.
   Run `path_case: home-tilde` for home-directory expansion (`#368`) and `path_case: working-directory` for end-to-end `working_directory` resolution.
