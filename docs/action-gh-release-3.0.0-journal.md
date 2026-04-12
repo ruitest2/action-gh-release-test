@@ -133,3 +133,79 @@ This evidence should be recorded in the final upstream work summary and, if need
 - README, `action.yml`, `CHANGELOG.md`, tests, and `dist/index.js` reflect the final contract.
 - The exact-ref harness suite above is green and the run URLs are captured.
 - The `3.0.0` release plan preserves `v2` and introduces `v3` as the new floating major tag.
+
+## Execution Update
+
+### Upstream branch executed
+
+- Exact upstream base used for the rebase: `c2e35e0` (`origin/master`).
+- Exact upstream branch under test after execution: `copilot/fix-8cc96c9f-14fa-4c73-89d2-a72cbdcbee20` at `218a0ca`.
+- Final branch commit stack:
+  - `218a0ca` `release: prepare 3.0.0`
+  - `e48d846` `chore: bump @types/node, enable Dependabot updates, rebuild dist`
+  - `1fff77c` `feat: move action runtime to node24 and require Node >=24`
+- Stale plan assumptions corrected during execution:
+  - current upstream `master` already uses `esbuild`; the branch was rebased onto that layout instead of reviving the older `ncc` shape
+  - upstream package metadata on `master` was already `2.6.2`, so the release prep had to start from the current metadata rather than the older `2.4.x` branch snapshot
+  - `RELEASE.md` already existed and was updated in place for the `v3` release flow
+
+### Branch contents after rebase and release prep
+
+- `action.yml` now declares `runs.using: node24`
+- `package.json` build scripts now target Node 24, declare `engines.node >=24`, and bump the package version to `3.0.0`
+- `@types/node` now tracks the Node 24 line and Dependabot no longer ignores future `@types/node` updates
+- `README.md`, `CHANGELOG.md`, and `RELEASE.md` now document the `3.x` / Node 24 contract and the `v3` floating-tag flow
+- `npm run updatetag` now moves `v3` and tolerates the first `v3` creation where the floating tag does not already exist
+
+### Local verification
+
+- Rebased branch verification passed:
+  - `npm run fmtcheck`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm test`
+- Release-prep verification passed again after the `3.0.0` metadata and docs updates:
+  - `npm run fmtcheck`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm test`
+
+### Major-flow harness matrix
+
+Every major flow in [TESTS.md](TESTS.md) was exercised from this repo's `main` branch against the exact upstream ref `softprops/action-gh-release@copilot/fix-8cc96c9f-14fa-4c73-89d2-a72cbdcbee20`.
+
+| Flow | Workflow evidence | Result |
+| --- | --- | --- |
+| Basic release creation and upload | [e2e 24298578300](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298578300) | pass |
+| Assets outputs contract | [Linux 24298579264](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298579264), [Windows 24298580547](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298580547) | pass |
+| Existing draft reuse | [keep 24298581500](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298581500), [publish 24298582636](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298582636) | pass |
+| Release-linked discussion creation | [24298583690](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298583690) | pass |
+| Shared-tag races | [repro-race 24298584683](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298584683), [repro-finalize-race 24298585638](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298585638) | pass |
+| Windows release path | [repro-windows 24298586527](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298586527), [repro-windows-glob 24298596650](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298596650) | pass |
+| Prerelease creation with `draft: false` | [24298587460](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298587460) | pass |
+| Prerelease observer behavior | initial sweep [24298588353](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298588353) failed with stale expectations; corrected rerun [24298663088](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298663088) passed with both `observe-prereleased` and `observe-published` expected | pass after expectation correction |
+| Existing release update by tag | [append_body 24298589412](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298589412), [refs/tags 24298591132](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298591132), initial omit-name sweep [24298590268](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298590268), isolated rerun [24298680672](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298680672) | pass after isolated omit-name rerun |
+| Duplicate-asset concurrent upload | [24298591943](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298591943) | pass |
+| Token precedence for remote repo | [24298593684](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298593684) | pass |
+| Path resolution and `working_directory` | [home-tilde 24298594575](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298594575), [working-directory 24298595636](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298595636), [brace glob 24298597718](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298597718) | pass |
+| Release metadata options | [target_commitish 24298599469](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298599469), [previous_tag 24298600422](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298600422), [body too long 24298601341](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298601341), isolated make-latest rerun [24298679827](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298679827) | pass |
+| Asset-count and special-file coverage | [many-files 24298602317](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298602317), [dm asset 24298603247](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298603247), corrected dotfile rerun [24298662230](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298662230) | pass |
+| Parentheses filename preservation | [24298604172](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298604172) | known GitHub raw-name normalization limitation; label restored but raw download name still normalized |
+| Remote repository release creation | branch run [24298592800](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298592800), current `master` comparison [24298664861](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298664861) | still failing on current upstream; not introduced by the Node 24 branch |
+
+### Triage notes for the non-green first-pass runs
+
+- `repro-make-latest` first failed in the full concurrent sweep because another release-creating workflow updated the repo-wide latest release during the assertion window. The isolated rerun [24298679827](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298679827) passed.
+- `repro-dotfile` first failed because the workflow still expected displayed asset name `default.config`. The actual asset record on the branch was raw name `default.config` plus label `.config`, which matches the current fixed behavior. The corrected rerun [24298662230](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298662230) passed.
+- `trigger-prerelease` first failed because the workflow still expected `observe-prereleased` to stay idle. Current fixed behavior fires both observer workflows; the corrected rerun [24298663088](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298663088) passed.
+- `repro-omit-name` failed once in the large concurrent sweep but passed both in the isolated branch rerun [24298680672](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298680672) and in the current-`master` comparison [24298663999](https://github.com/ruitest2/action-gh-release-test/actions/runs/24298663999). Treat the first failure as sweep noise, not a persistent regression.
+- `repro-paren-asset` remains consistent with the documented GitHub normalization limitation for raw asset names. The branch restored the label `appName(x64)_1.0.0.1.msi`, but GitHub still stored the raw asset name as `appName.x64._1.0.0.1.msi`.
+- `repro-remote-repo` failed on both the Node 24 branch and current upstream `master`. In both runs, the action created a remote release object and finished with an `untagged-...` release URL instead of making the requested tag discoverable in the remote repository. This remains a current-upstream follow-up item, not a regression introduced by the `3.0.0` branch.
+
+### Execution verdict
+
+- The Node 24 `3.0.0` branch is rebased onto current upstream `master`, locally green, and externally exercised across every major harness flow.
+- After correcting harness expectation drift and rerunning the noisy cases in isolation, the exact-ref branch coverage is green across the major release, update, draft, prerelease, race, Windows, path-resolution, metadata, and asset-shape flows.
+- Remaining non-green follow-ups are outside the scope of the Node 24 branch itself:
+  - remote-repo release creation is still failing on current upstream `master`
+  - parentheses filename preservation still reflects GitHub's raw asset-name normalization rather than an action-side fix regression
