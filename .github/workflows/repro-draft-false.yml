@@ -598,23 +598,25 @@ jobs:
       - name: Resolve old and new tag targets
         if: steps.guard.outputs.enabled == 'true'
         id: commits
+        env:
+          SLOT: ${{ matrix.slot }}
         run: |
-          mapfile -t candidates < <(
-            git rev-list "origin/${{ github.event.repository.default_branch }}" |
-              while read -r sha; do
-                if ! git diff-tree --no-commit-id --name-only -r "$sha" |
-                  grep -q '^\.github/workflows/'; then
-                  echo "$sha"
-                fi
-              done |
-              head -n 2
-          )
-          if [ "${#candidates[@]}" -ne 2 ]; then
-            echo "could not resolve two non-workflow commits" >&2
-            exit 1
-          fi
-          echo "new_sha=${candidates[0]}" >> "$GITHUB_OUTPUT"
-          echo "old_sha=${candidates[1]}" >> "$GITHUB_OUTPUT"
+          target_file=".issue-772-tag-target-${SLOT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          printf 'old target for %s\n' "$TAG_NAME" > "$target_file"
+          git add "$target_file"
+          git commit -m "test: create old issue 772 tag target"
+          old_sha=$(git rev-parse HEAD)
+
+          printf 'new target for %s\n' "$TAG_NAME" > "$target_file"
+          git add "$target_file"
+          git commit -m "test: create new issue 772 tag target"
+          new_sha=$(git rev-parse HEAD)
+
+          echo "new_sha=$new_sha" >> "$GITHUB_OUTPUT"
+          echo "old_sha=$old_sha" >> "$GITHUB_OUTPUT"
 
       - name: Push moving tag at old commit
         if: steps.guard.outputs.enabled == 'true'
