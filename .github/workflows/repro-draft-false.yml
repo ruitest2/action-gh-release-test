@@ -160,8 +160,8 @@ jobs:
         scenario:
           - omitted
           - 'null'
-          - false
-          - true
+          - 'false'
+          - 'true'
     env:
       TAG_NAME: issue795-${{ matrix.scenario }}-${{ github.run_id }}-${{ github.run_attempt }}
       ASSET_NAME: issue-795-${{ matrix.scenario }}.txt
