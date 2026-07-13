@@ -1,0 +1,59 @@
+name: repro-gitea-overwrite
+run-name: gitea-${{ inputs.gitea_version }}-${{ inputs.action_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_repository:
+        description: Action repository to check out
+        required: true
+        default: softprops/action-gh-release
+      action_ref:
+        description: Action ref to test
+        required: true
+      gitea_version:
+        description: Gitea version
+        required: true
+        type: choice
+        options:
+          - 1.24.7
+          - 1.26.4
+      expected_second_run:
+        description: Expected outcome when replacing the existing asset
+        required: true
+        type: choice
+        options:
+          - success
+          - failure
+      keep_container_logs:
+        description: Print Gitea logs even when the scenario passes
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  overwrite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out harness
+        uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+
+      - name: Check out action under test
+        uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Run Gitea overwrite lifecycle
+        env:
+          ACTION_REF: ${{ inputs.action_ref }}
+          ACTION_REPOSITORY: ${{ inputs.action_repository }}
+          EXPECTED_SECOND_RUN: ${{ inputs.expected_second_run }}
+          GITEA_VERSION: ${{ inputs.gitea_version }}
+          KEEP_CONTAINER_LOGS: ${{ inputs.keep_container_logs }}
+        run: scripts/gitea-overwrite-harness.sh
