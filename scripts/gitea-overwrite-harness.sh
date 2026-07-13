@@ -56,6 +56,7 @@ run_action() {
   local output_file=$1
   local log_file=$2
 
+  : >"$output_file"
   (
     cd "$repository_directory"
     env \
@@ -79,6 +80,21 @@ run_action() {
       INPUT_TOKEN="$gitea_token" \
       node "$action_bundle"
   ) >"$log_file" 2>&1
+}
+
+wait_for_repository() {
+  local repository
+
+  for _ in $(seq 1 30); do
+    repository="$(api GET "/repos/${test_user}/${test_repository}")"
+    if jq -e '.empty == false' <<<"$repository" >/dev/null; then
+      return
+    fi
+    sleep 1
+  done
+
+  echo "Gitea still reports the pushed repository as empty" >&2
+  return 1
 }
 
 release_snapshot() {
@@ -159,6 +175,7 @@ commit_sha="$(git -C "$repository_directory" rev-parse HEAD)"
 git -C "$repository_directory" remote add origin \
   "http://${test_user}:${gitea_token}@127.0.0.1:3000/${test_user}/${test_repository}.git"
 git -C "$repository_directory" push --set-upstream origin main >/dev/null 2>&1
+wait_for_repository
 printf '{}\n' >"${temp_directory}/event.json"
 
 original_content="original content ${GITHUB_RUN_ID}"
