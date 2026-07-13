@@ -1,0 +1,21 @@
+TESTS.md
+  s_781304debb879a::t_7023291464e60c 20
+.github/workflows/e2e.yml
+  s_781304debb879a::t_7023291464e60c 50-51,53-55,83,153-186
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "05f3b6c4d14e4331ff1d732d497af2bac1c700fe",
+  "prompts": {},
+  "sessions": {
+    "s_781304debb879a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5904-3fac-7822-8d15-c1beb0507927",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
