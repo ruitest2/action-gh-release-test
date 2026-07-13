@@ -134,13 +134,12 @@ docker exec --user git "$container" gitea admin user create \
   --admin \
   --must-change-password=false >/dev/null
 
-token_response="$(curl --fail --silent --show-error \
-  --user "${test_user}:${test_password}" \
-  --header "Content-Type: application/json" \
-  --data '{"name":"issue-803-harness"}' \
-  "${api_url}/users/${test_user}/tokens")"
-gitea_token="$(jq -r '.sha1' <<<"$token_response")"
-if [[ -z "$gitea_token" || "$gitea_token" == "null" ]]; then
+gitea_token="$(docker exec --user git "$container" gitea admin user generate-access-token \
+  --username "$test_user" \
+  --token-name issue-803-harness \
+  --scopes all \
+  --raw)"
+if [[ -z "$gitea_token" ]]; then
   echo "Gitea did not return an access token" >&2
   exit 1
 fi
