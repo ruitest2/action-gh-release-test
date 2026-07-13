@@ -1,0 +1,19 @@
+scripts/gitea-overwrite-harness.sh
+  s_781304debb879a::t_aa272c2223815c 59,85-99,178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "dc8331d84cf6b14ed97bbcdeb424602d78f050c1",
+  "prompts": {},
+  "sessions": {
+    "s_781304debb879a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5904-3fac-7822-8d15-c1beb0507927",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
