@@ -585,7 +585,7 @@ jobs:
         if: steps.guard.outputs.enabled == 'true'
         uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Check out action under test
         if: steps.guard.outputs.enabled == 'true'
@@ -599,8 +599,22 @@ jobs:
         if: steps.guard.outputs.enabled == 'true'
         id: commits
         run: |
-          echo "old_sha=$(git rev-parse HEAD~1)" >> "$GITHUB_OUTPUT"
-          echo "new_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          mapfile -t candidates < <(
+            git rev-list "origin/${{ github.event.repository.default_branch }}" |
+              while read -r sha; do
+                if ! git diff-tree --no-commit-id --name-only -r "$sha" |
+                  grep -q '^\.github/workflows/'; then
+                  echo "$sha"
+                fi
+              done |
+              head -n 2
+          )
+          if [ "${#candidates[@]}" -ne 2 ]; then
+            echo "could not resolve two non-workflow commits" >&2
+            exit 1
+          fi
+          echo "new_sha=${candidates[0]}" >> "$GITHUB_OUTPUT"
+          echo "old_sha=${candidates[1]}" >> "$GITHUB_OUTPUT"
 
       - name: Push moving tag at old commit
         if: steps.guard.outputs.enabled == 'true'
