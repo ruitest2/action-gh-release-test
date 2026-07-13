@@ -148,7 +148,7 @@ jobs:
       matrix:
         scenario:
           - omitted
-          - null
+          - 'null'
           - false
           - true
     env:
@@ -376,6 +376,7 @@ jobs:
               .addHeading(`Issue 795 ${scenario} summary`)
               .addCodeBlock(JSON.stringify(summary, null, 2), "json")
               .write();
+            core.info(`ISSUE_795_RESULT=${JSON.stringify(summary)}`);
 
             if (process.env.EXPECTED_BEHAVIOR === "fixed" && !fixedState) {
               core.setFailed(`existing draft ${scenario} scenario did not satisfy the fixed lifecycle`);
@@ -401,9 +402,29 @@ jobs:
               });
               return releases.filter((release) => release.tag_name === process.env.TAG_NAME);
             };
+            const isMissingRef = (error) =>
+              error.status === 404 ||
+              (error.status === 422 &&
+                /Reference does not exist/i.test(
+                  error.response?.data?.message ?? error.message,
+                ));
 
-            for (const release of await listMatchingReleases()) {
-              await github.rest.repos.deleteRelease({ owner, repo, release_id: release.id });
+            let remaining = [];
+            for (let attempt = 1; attempt <= 5; attempt += 1) {
+              remaining = await listMatchingReleases();
+              if (remaining.length === 0) break;
+
+              for (const release of remaining) {
+                try {
+                  await github.rest.repos.deleteRelease({ owner, repo, release_id: release.id });
+                } catch (error) {
+                  if (error.status !== 404) throw error;
+                }
+              }
+
+              if (attempt < 5) {
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+              }
             }
 
             try {
@@ -413,15 +434,10 @@ jobs:
                 ref: `tags/${process.env.TAG_NAME}`,
               });
             } catch (error) {
-              if (
-                error.status !== 404 &&
-                !(error.status === 422 && /Reference does not exist/i.test(error.message))
-              ) {
-                throw error;
-              }
+              if (!isMissingRef(error)) throw error;
             }
 
-            const remaining = await listMatchingReleases();
+            remaining = await listMatchingReleases();
             if (remaining.length !== 0) {
               throw new Error(`cleanup left ${remaining.length} matching releases`);
             }
@@ -433,7 +449,7 @@ jobs:
               });
               throw new Error("cleanup left the generated tag ref");
             } catch (error) {
-              if (error.status !== 404) throw error;
+              if (!isMissingRef(error)) throw error;
             }
             try {
               await github.request("DELETE /repos/{owner}/{repo}/git/refs/{ref}", {
