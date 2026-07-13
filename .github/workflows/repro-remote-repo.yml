@@ -13,7 +13,7 @@ on:
       action_ref:
         description: Action ref to test
         required: true
-        default: v2.6.1
+        default: v3.0.2
       release_repository:
         description: Dedicated remote repository used for disposable releases
         required: true

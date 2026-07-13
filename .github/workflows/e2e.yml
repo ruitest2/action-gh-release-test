@@ -17,7 +17,7 @@ on:
       action_ref:
         description: Action ref to test
         required: true
-        default: v2.6.1
+        default: v3.0.2
       tag_name:
         description: Optional tag name override for manual exact-ref smoke runs
         required: false
@@ -61,7 +61,7 @@ jobs:
       - name: Release with pinned baseline
         id: release_push
         if: github.event_name == 'push'
-        uses: softprops/action-gh-release@v2.6.1
+        uses: softprops/action-gh-release@v3.0.2
         with:
           files: |
             test-assets/release-notes.md
@@ -119,7 +119,7 @@ jobs:
                   ? process.env.ACTION_REPOSITORY
                   : "softprops/action-gh-release",
               action_ref:
-                eventName === "workflow_dispatch" ? process.env.ACTION_REF : "v2.6.1",
+                eventName === "workflow_dispatch" ? process.env.ACTION_REF : "v3.0.2",
               step_outcome: releaseOutcome,
               release: release
                 ? {
