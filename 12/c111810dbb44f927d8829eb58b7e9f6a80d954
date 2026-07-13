@@ -1,0 +1,19 @@
+.github/workflows/repro-remote-repo.yml
+  s_781304debb879a::t_9efe81428aa5c4 209-225,345-350,358-359,362,364-382,387,391-396
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "12c111810dbb44f927d8829eb58b7e9f6a80d954",
+  "prompts": {},
+  "sessions": {
+    "s_781304debb879a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5904-3fac-7822-8d15-c1beb0507927",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
