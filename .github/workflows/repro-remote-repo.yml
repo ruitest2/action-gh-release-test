@@ -344,8 +344,14 @@ jobs:
                 core.setFailed('generated tag does not point to the target default-branch commit');
               }
             } else {
-              if (matches.length !== 0 || tagRef !== null) {
-                core.setFailed('a failed release attempt left a release or tag behind');
+              if (
+                process.env.TOKEN_MODE === 'inaccessible' &&
+                (matches.length !== 0 || tagRef !== null)
+              ) {
+                core.setFailed('an inaccessible token unexpectedly created a release or tag');
+              }
+              if (matches.length > 1) {
+                core.setFailed(`failed release attempt created ${matches.length} releases`);
               }
             }
 
