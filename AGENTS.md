@@ -77,6 +77,8 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
   Do not keep `#541` in the active bug-fix bucket unless the workflow shows a distinct runtime defect beyond the documented `token: ""` semantics.
 - Use `.github/workflows/repro-unicode-asset.yml` only to confirm docs/usage behavior for Unicode and special-character asset naming (`#542`, likely related to `#393`).
   Do not keep `#542` in the active bug-fix bucket unless the workflow shows an action-level defect beyond GitHub's own filename normalization and label limits.
+- Use `.github/workflows/repro-gitea-overwrite.yml` for Gitea release-asset replacement behavior in upstream issue `#803`.
+  It runs the checked-out action bundle directly against an ephemeral pinned Gitea container and verifies both the failing pre-fix lifecycle and the successful replacement lifecycle without external credentials.
 - When doing historical bug sweeps, stay repro-first.
   Record concrete current evidence in the journal before suggesting a closeout, a docs reclassification, or a reopen candidate.
 - Separate historical issues into three buckets in the journal: confirmed non-repro on current upstream, confirmed docs/usage or platform limitations, and still-reproducible current defects.
