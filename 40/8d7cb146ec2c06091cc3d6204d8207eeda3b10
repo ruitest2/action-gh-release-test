@@ -1,0 +1,23 @@
+TESTS.md
+  s_781304debb879a::t_24eb5a031ef0d8 25
+.github/workflows/repro-draft-false.yml
+  s_781304debb879a::t_24eb5a031ef0d8 23-30,142-437
+AGENTS.md
+  s_781304debb879a::t_24eb5a031ef0d8 65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "408d7cb146ec2c06091cc3d6204d8207eeda3b10",
+  "prompts": {},
+  "sessions": {
+    "s_781304debb879a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5904-3fac-7822-8d15-c1beb0507927",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
