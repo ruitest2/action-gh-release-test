@@ -1,5 +1,7 @@
 name: repro-remote-repo
-run-name: repro-remote-repo-${{ inputs.action_ref }}
+run-name: >-
+  issue-786-${{ inputs.action_ref }}-${{ inputs.runner }}-${{
+  inputs.category_mode }}-${{ inputs.token_mode }}
 
 on:
   workflow_dispatch:
@@ -13,103 +15,344 @@ on:
         required: true
         default: v2.6.1
       release_repository:
-        description: Repository to publish the release into
+        description: Dedicated remote repository used for disposable releases
         required: true
-        default: chenrui333/action-gh-release
+        default: ruitest2/action-gh-release-target-no-discussions
+      runner:
+        description: Runner used to execute the action
+        required: true
+        type: choice
+        options:
+          - ubuntu-latest
+          - windows-latest
+        default: ubuntu-latest
+      category_mode:
+        description: How discussion_category_name is supplied
+        required: true
+        type: choice
+        options:
+          - omitted
+          - empty
+          - invalid
+        default: omitted
+      token_mode:
+        description: Token with or without write access to the remote repository
+        required: true
+        type: choice
+        options:
+          - valid
+          - inaccessible
+        default: valid
+      expected_outcome:
+        description: Expected action-step outcome
+        required: true
+        type: choice
+        options:
+          - success
+          - failure
+        default: success
+      expected_error_class:
+        description: Expected classification when release creation fails
+        required: true
+        type: choice
+        options:
+          - none
+          - repository-access
+          - discussion-category
+          - unknown
+        default: none
 
 permissions:
   contents: read
 
 jobs:
   repro:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 15
     env:
-      TAG_NAME: v639.${{ github.run_id }}.${{ github.run_attempt }}
+      TAG_NAME: >-
+        issue786-${{ inputs.category_mode }}-${{ inputs.token_mode }}-${{
+        github.run_id }}-${{ github.run_attempt }}
       RELEASE_REPOSITORY: ${{ inputs.release_repository }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out harness
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
-      - uses: actions/checkout@v6
+      - name: Check out action under test
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}
           path: action-under-test
 
-      - name: Prepare asset
+      - name: Reject unsupported inaccessible-token category combinations
+        if: inputs.token_mode == 'inaccessible' && inputs.category_mode != 'omitted'
+        shell: bash
         run: |
-          printf 'remote repo repro for %s\n' "${TAG_NAME}" > remote-repo.txt
+          echo "inaccessible token coverage intentionally uses an omitted discussion category" >&2
+          exit 1
 
-      - name: Attempt remote release
-        id: release
-        continue-on-error: true
-        uses: ./action-under-test
-        with:
-          tag_name: ${{ env.TAG_NAME }}
-          name: Remote repo repro ${{ env.TAG_NAME }}
-          draft: true
-          repository: ${{ inputs.release_repository }}
-          token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
-          files: remote-repo.txt
-
-      - name: Summarize remote repo outcome
-        id: inspect
-        if: always()
-        uses: actions/github-script@v8
+      - name: Verify valid token access
+        if: inputs.token_mode == 'valid'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           github-token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
           script: |
-            const [owner, repo] = process.env.RELEASE_REPOSITORY.split("/");
+            const [owner, repo] = process.env.RELEASE_REPOSITORY.split('/');
+            const { data } = await github.rest.repos.get({ owner, repo });
+            if (!(data.permissions?.push || data.permissions?.maintain || data.permissions?.admin)) {
+              core.setFailed('the configured remote-release token cannot write to the target repository');
+            }
+
+      - name: Verify inaccessible token boundary
+        if: inputs.token_mode == 'inaccessible'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const [owner, repo] = process.env.RELEASE_REPOSITORY.split('/');
+            const { data } = await github.rest.repos.get({ owner, repo });
+            if (data.permissions?.push || data.permissions?.maintain || data.permissions?.admin) {
+              core.setFailed('github.token unexpectedly has write access to the remote target');
+            }
+
+      - name: Prepare asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'remote repo issue 786 for %s\n' "$TAG_NAME" > remote-repo.txt
+
+      - name: Release with omitted discussion input and valid token
+        id: release_valid_omitted
+        if: inputs.token_mode == 'valid' && inputs.category_mode == 'omitted'
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          repository: ${{ inputs.release_repository }}
+          token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
+          tag_name: ${{ env.TAG_NAME }}
+          name: Remote release ${{ env.TAG_NAME }}
+          prerelease: true
+          files: remote-repo.txt
+
+      - name: Release with empty discussion input and valid token
+        id: release_valid_empty
+        if: inputs.token_mode == 'valid' && inputs.category_mode == 'empty'
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          repository: ${{ inputs.release_repository }}
+          token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
+          tag_name: ${{ env.TAG_NAME }}
+          name: Remote release ${{ env.TAG_NAME }}
+          prerelease: true
+          discussion_category_name: ""
+          files: remote-repo.txt
+
+      - name: Release with invalid discussion input and valid token
+        id: release_valid_invalid
+        if: inputs.token_mode == 'valid' && inputs.category_mode == 'invalid'
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          repository: ${{ inputs.release_repository }}
+          token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
+          tag_name: ${{ env.TAG_NAME }}
+          name: Remote release ${{ env.TAG_NAME }}
+          prerelease: true
+          discussion_category_name: issue-786-category-does-not-exist
+          files: remote-repo.txt
+
+      - name: Release without remote access
+        id: release_inaccessible_omitted
+        if: inputs.token_mode == 'inaccessible' && inputs.category_mode == 'omitted'
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          repository: ${{ inputs.release_repository }}
+          token: ${{ github.token }}
+          tag_name: ${{ env.TAG_NAME }}
+          name: Remote release ${{ env.TAG_NAME }}
+          prerelease: true
+          files: remote-repo.txt
+
+      - name: Inspect remote release outcome
+        id: inspect
+        if: always()
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          ACTION_REF: ${{ inputs.action_ref }}
+          CATEGORY_MODE: ${{ inputs.category_mode }}
+          TOKEN_MODE: ${{ inputs.token_mode }}
+          EXPECTED_OUTCOME: ${{ inputs.expected_outcome }}
+          EXPECTED_ERROR_CLASS: ${{ inputs.expected_error_class }}
+          RELEASE_OUTCOME: >-
+            ${{ steps.release_valid_omitted.outcome ||
+            steps.release_valid_empty.outcome ||
+            steps.release_valid_invalid.outcome ||
+            steps.release_inaccessible_omitted.outcome }}
+          OUTPUT_RELEASE_ID: >-
+            ${{ steps.release_valid_omitted.outputs.id ||
+            steps.release_valid_empty.outputs.id ||
+            steps.release_valid_invalid.outputs.id ||
+            steps.release_inaccessible_omitted.outputs.id }}
+          OUTPUT_RELEASE_URL: >-
+            ${{ steps.release_valid_omitted.outputs.url ||
+            steps.release_valid_empty.outputs.url ||
+            steps.release_valid_invalid.outputs.url ||
+            steps.release_inaccessible_omitted.outputs.url }}
+        with:
+          github-token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
+          script: |
+            const { createHash } = require('node:crypto');
+            const [owner, repo] = process.env.RELEASE_REPOSITORY.split('/');
             const releases = await github.paginate(github.rest.repos.listReleases, {
               owner,
               repo,
               per_page: 100,
             });
-            const release = releases.find((candidate) => candidate.tag_name === process.env.TAG_NAME);
+            const matches = releases.filter(
+              (candidate) => candidate.tag_name === process.env.TAG_NAME,
+            );
+            const release = matches[0] ?? null;
+            const expectedOutcome = process.env.EXPECTED_OUTCOME;
+            const outcome = process.env.RELEASE_OUTCOME;
+            const errorClass = outcome === 'success'
+              ? 'none'
+              : process.env.TOKEN_MODE === 'inaccessible'
+                ? 'repository-access'
+                : process.env.CATEGORY_MODE === 'invalid'
+                  ? 'discussion-category'
+                  : 'unknown';
+
+            let tagRef = null;
+            try {
+              const { data } = await github.rest.git.getRef({
+                owner,
+                repo,
+                ref: `tags/${process.env.TAG_NAME}`,
+              });
+              tagRef = data.object.sha;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            let assetDigest = null;
+            let assetContentsMatch = false;
+            if (release?.assets.length === 1) {
+              const response = await fetch(release.assets[0].browser_download_url);
+              if (!response.ok) {
+                throw new Error(`asset download failed with HTTP ${response.status}`);
+              }
+              const contents = Buffer.from(await response.arrayBuffer());
+              const expected = Buffer.from(
+                `remote repo issue 786 for ${process.env.TAG_NAME}\n`,
+              );
+              assetDigest = createHash('sha256').update(contents).digest('hex');
+              assetContentsMatch = contents.equals(expected);
+            }
+
+            const target = await github.rest.repos.get({ owner, repo });
+            const targetHead = await github.rest.repos.getCommit({
+              owner,
+              repo,
+              ref: target.data.default_branch,
+            });
             const summary = {
-              tag_name: process.env.TAG_NAME,
-              repository: process.env.RELEASE_REPOSITORY,
-              step_outcome: "${{ steps.release.outcome }}",
-              release: release
-                ? {
-                    id: release.id,
-                    draft: release.draft,
-                    asset_names: release.assets.map((asset) => asset.name),
-                    html_url: release.html_url,
-                  }
-                : null,
+              action_ref: process.env.ACTION_REF,
+              runner: '${{ inputs.runner }}',
+              release_repository: process.env.RELEASE_REPOSITORY,
+              category_mode: process.env.CATEGORY_MODE,
+              token_mode: process.env.TOKEN_MODE,
+              step_outcome: outcome,
+              expected_outcome: expectedOutcome,
+              error_class: errorClass,
+              expected_error_class: process.env.EXPECTED_ERROR_CLASS,
+              release_id: release?.id ?? null,
+              output_release_id: process.env.OUTPUT_RELEASE_ID || null,
+              release_count: matches.length,
+              draft: release?.draft ?? null,
+              prerelease: release?.prerelease ?? null,
+              discussion_url: release?.discussion_url ?? null,
+              asset_names: release?.assets.map((asset) => asset.name) ?? [],
+              asset_sha256: assetDigest,
+              asset_contents_match: assetContentsMatch,
+              output_release_url: process.env.OUTPUT_RELEASE_URL || null,
+              release_url: release?.html_url ?? null,
+              tag_ref: tagRef,
+              expected_tag_target: targetHead.data.sha,
             };
 
-            if (release) {
-              core.setOutput("release_id", String(release.id));
-            }
-
-            core.summary
-              .addHeading("Remote repo summary")
-              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+            await core.summary
+              .addHeading('Issue 786 remote release summary')
+              .addCodeBlock(JSON.stringify(summary, null, 2), 'json')
               .write();
 
-            if (!release) {
-              core.setFailed(`no release found for ${process.env.TAG_NAME} in ${process.env.RELEASE_REPOSITORY}`);
+            if (outcome !== expectedOutcome) {
+              core.setFailed(`expected action outcome ${expectedOutcome}, got ${outcome}`);
+            }
+            if (errorClass !== process.env.EXPECTED_ERROR_CLASS) {
+              core.setFailed(
+                `expected error class ${process.env.EXPECTED_ERROR_CLASS}, got ${errorClass}`,
+              );
             }
 
-      - name: Cleanup remote draft release
+            if (expectedOutcome === 'success') {
+              if (matches.length !== 1 || !release) {
+                core.setFailed(`expected one release, found ${matches.length}`);
+                return;
+              }
+              if (String(release.id) !== process.env.OUTPUT_RELEASE_ID) {
+                core.setFailed('action release ID output does not match the remote release');
+              }
+              if (release.html_url !== process.env.OUTPUT_RELEASE_URL) {
+                core.setFailed('action release URL output does not match the remote release');
+              }
+              if (release.draft || !release.prerelease) {
+                core.setFailed('remote release was not published as a prerelease');
+              }
+              if (release.discussion_url) {
+                core.setFailed('no linked discussion was expected on the discussions-disabled target');
+              }
+              if (
+                release.assets.length !== 1 ||
+                release.assets[0].name !== 'remote-repo.txt' ||
+                !assetContentsMatch
+              ) {
+                core.setFailed('remote release asset did not match the prepared fixture');
+              }
+              if (tagRef !== targetHead.data.sha) {
+                core.setFailed('generated tag does not point to the target default-branch commit');
+              }
+            } else {
+              if (matches.length !== 0 || tagRef !== null) {
+                core.setFailed('a failed release attempt left a release or tag behind');
+              }
+            }
+
+      - name: Cleanup remote release and tag
         if: always()
-        uses: actions/github-script@v8
-        env:
-          RELEASE_ID: ${{ steps.inspect.outputs.release_id }}
-          TAG_NAME: ${{ env.TAG_NAME }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           github-token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
           script: |
             const {
               deleteTagIfExists,
             } = require(`${process.env.GITHUB_WORKSPACE}/scripts/release-harness.js`);
-            const [owner, repo] = process.env.RELEASE_REPOSITORY.split("/");
-            if (process.env.RELEASE_ID) {
+            const [owner, repo] = process.env.RELEASE_REPOSITORY.split('/');
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const matches = releases.filter(
+              (candidate) => candidate.tag_name === process.env.TAG_NAME,
+            );
+            for (const release of matches) {
               await github.rest.repos.deleteRelease({
                 owner,
                 repo,
-                release_id: Number(process.env.RELEASE_ID),
+                release_id: release.id,
               });
             }
             await deleteTagIfExists({
@@ -118,3 +361,12 @@ jobs:
               repo,
               tag: process.env.TAG_NAME,
             });
+
+            const remaining = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            if (remaining.some((release) => release.tag_name === process.env.TAG_NAME)) {
+              core.setFailed(`release cleanup failed for ${process.env.TAG_NAME}`);
+            }

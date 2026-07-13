@@ -56,8 +56,8 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
   Run `path_case: home-tilde` for home-directory expansion (`#368`) and `path_case: working-directory` for end-to-end `working_directory` resolution.
 - Use `.github/workflows/repro-brace-glob.yml` for brace/comma glob parsing (`#611`, `#204`).
 - Use `.github/workflows/repro-windows-glob.yml` for Windows backslash-heavy file glob behavior (`#280`, `#614`, `#311`).
-- Use `.github/workflows/repro-remote-repo.yml` for remote-repository release creation and asset upload (`#639`, `#308`).
-  Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow targets a separate repository and now cleans up both the test release and the matching remote tag after inspection.
+- Use `.github/workflows/repro-remote-repo.yml` for remote-repository release creation and asset upload (`#639`, `#308`, upstream issue `#786`).
+  Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first. The workflow targets the dedicated discussions-disabled `ruitest2/action-gh-release-target-no-discussions` repository, distinguishes omitted, empty, and invalid discussion categories plus valid and inaccessible tokens, supports Windows and Ubuntu runners, and cleans up every matching release and tag after inspection.
 - Use `.github/workflows/repro-token-precedence.yml` for remote-repository token precedence (`#639`).
   Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow intentionally sets `GITHUB_TOKEN` and expects the explicit `token` input to win, then cleans up both the test release and the matching remote tag.
 - Use `.github/workflows/repro-existing-draft.yml` for existing-draft reuse and draft-state behavior (`#163`, PR `#245`).
