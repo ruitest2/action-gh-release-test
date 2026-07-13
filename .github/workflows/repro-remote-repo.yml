@@ -186,11 +186,11 @@ jobs:
           TOKEN_MODE: ${{ inputs.token_mode }}
           EXPECTED_OUTCOME: ${{ inputs.expected_outcome }}
           EXPECTED_ERROR_CLASS: ${{ inputs.expected_error_class }}
-          RELEASE_OUTCOME: >-
-            ${{ steps.release_valid_omitted.outcome ||
-            steps.release_valid_empty.outcome ||
-            steps.release_valid_invalid.outcome ||
-            steps.release_inaccessible_omitted.outcome }}
+          RELEASE_VALID_OMITTED_OUTCOME: ${{ steps.release_valid_omitted.outcome }}
+          RELEASE_VALID_EMPTY_OUTCOME: ${{ steps.release_valid_empty.outcome }}
+          RELEASE_VALID_INVALID_OUTCOME: ${{ steps.release_valid_invalid.outcome }}
+          RELEASE_INACCESSIBLE_OMITTED_OUTCOME: >-
+            ${{ steps.release_inaccessible_omitted.outcome }}
           OUTPUT_RELEASE_ID: >-
             ${{ steps.release_valid_omitted.outputs.id ||
             steps.release_valid_empty.outputs.id ||
@@ -225,7 +225,17 @@ jobs:
             }
             const release = matches[0] ?? null;
             const expectedOutcome = process.env.EXPECTED_OUTCOME;
-            const outcome = process.env.RELEASE_OUTCOME;
+            const scenario = `${process.env.TOKEN_MODE}-${process.env.CATEGORY_MODE}`;
+            const outcomes = {
+              'valid-omitted': process.env.RELEASE_VALID_OMITTED_OUTCOME,
+              'valid-empty': process.env.RELEASE_VALID_EMPTY_OUTCOME,
+              'valid-invalid': process.env.RELEASE_VALID_INVALID_OUTCOME,
+              'inaccessible-omitted': process.env.RELEASE_INACCESSIBLE_OMITTED_OUTCOME,
+            };
+            const outcome = outcomes[scenario];
+            if (!outcome || outcome === 'skipped') {
+              throw new Error(`no action step ran for scenario ${scenario}`);
+            }
             const errorClass = outcome === 'success'
               ? 'none'
               : process.env.TOKEN_MODE === 'inaccessible'
