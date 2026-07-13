@@ -386,7 +386,11 @@ jobs:
                 (candidate) => candidate.tag_name === process.env.TAG_NAME,
               );
             };
-            const matches = await listMatches();
+            let matches = await listMatches();
+            for (let attempt = 1; matches.length === 0 && attempt <= 5; attempt += 1) {
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+              matches = await listMatches();
+            }
             const releaseIds = new Set(matches.map((release) => release.id));
             if (process.env.OUTPUT_RELEASE_ID) {
               releaseIds.add(Number(process.env.OUTPUT_RELEASE_ID));
