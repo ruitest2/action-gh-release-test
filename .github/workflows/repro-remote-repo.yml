@@ -259,11 +259,16 @@ jobs:
             let assetDigest = null;
             let assetContentsMatch = false;
             if (release?.assets.length === 1) {
-              const response = await fetch(release.assets[0].browser_download_url);
-              if (!response.ok) {
-                throw new Error(`asset download failed with HTTP ${response.status}`);
-              }
-              const contents = Buffer.from(await response.arrayBuffer());
+              const response = await github.request(
+                'GET /repos/{owner}/{repo}/releases/assets/{asset_id}',
+                {
+                  owner,
+                  repo,
+                  asset_id: release.assets[0].id,
+                  headers: { accept: 'application/octet-stream' },
+                },
+              );
+              const contents = Buffer.from(response.data);
               const expected = Buffer.from(
                 `remote repo issue 786 for ${process.env.TAG_NAME}\n`,
               );
