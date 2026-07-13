@@ -1,0 +1,21 @@
+.github/workflows/e2e.yml
+  s_781304debb879a::t_efda4c262bce53 158,167-168,171,173-195,203-211
+.github/workflows/repro-release-discussion.yml
+  s_781304debb879a::t_efda4c262bce53 124,133-147,152-165,197-202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "718259825d5861a46d80a7d252b56ab149d82018",
+  "prompts": {},
+  "sessions": {
+    "s_781304debb879a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5904-3fac-7822-8d15-c1beb0507927",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
