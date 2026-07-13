@@ -111,9 +111,16 @@ jobs:
           github-token: ${{ github.token }}
           script: |
             const [owner, repo] = process.env.RELEASE_REPOSITORY.split('/');
-            const { data } = await github.rest.repos.get({ owner, repo });
-            if (data.permissions?.push || data.permissions?.maintain || data.permissions?.admin) {
-              core.setFailed('github.token unexpectedly has write access to the remote target');
+            try {
+              const { data } = await github.rest.repos.get({ owner, repo });
+              if (data.permissions?.push || data.permissions?.maintain || data.permissions?.admin) {
+                core.setFailed('github.token unexpectedly has write access to the remote target');
+              }
+            } catch (error) {
+              if (error.status !== 403 && error.status !== 404) {
+                throw error;
+              }
+              core.info(`remote target is inaccessible as expected (HTTP ${error.status})`);
             }
 
       - name: Prepare asset
