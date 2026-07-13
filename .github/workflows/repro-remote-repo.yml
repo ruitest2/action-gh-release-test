@@ -206,14 +206,23 @@ jobs:
           script: |
             const { createHash } = require('node:crypto');
             const [owner, repo] = process.env.RELEASE_REPOSITORY.split('/');
-            const releases = await github.paginate(github.rest.repos.listReleases, {
-              owner,
-              repo,
-              per_page: 100,
-            });
-            const matches = releases.filter(
-              (candidate) => candidate.tag_name === process.env.TAG_NAME,
-            );
+            const listMatches = async () => {
+              const releases = await github.paginate(github.rest.repos.listReleases, {
+                owner,
+                repo,
+                per_page: 100,
+              });
+              return releases.filter(
+                (candidate) => candidate.tag_name === process.env.TAG_NAME,
+              );
+            };
+            let matches = await listMatches();
+            if (process.env.EXPECTED_OUTCOME === 'success') {
+              for (let attempt = 1; matches.length === 0 && attempt <= 5; attempt += 1) {
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+                matches = await listMatches();
+              }
+            }
             const release = matches[0] ?? null;
             const expectedOutcome = process.env.EXPECTED_OUTCOME;
             const outcome = process.env.RELEASE_OUTCOME;
@@ -333,6 +342,12 @@ jobs:
       - name: Cleanup remote release and tag
         if: always()
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          OUTPUT_RELEASE_ID: >-
+            ${{ steps.release_valid_omitted.outputs.id ||
+            steps.release_valid_empty.outputs.id ||
+            steps.release_valid_invalid.outputs.id ||
+            steps.release_inaccessible_omitted.outputs.id }}
         with:
           github-token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
           script: |
@@ -340,33 +355,44 @@ jobs:
               deleteTagIfExists,
             } = require(`${process.env.GITHUB_WORKSPACE}/scripts/release-harness.js`);
             const [owner, repo] = process.env.RELEASE_REPOSITORY.split('/');
-            const releases = await github.paginate(github.rest.repos.listReleases, {
-              owner,
-              repo,
-              per_page: 100,
-            });
-            const matches = releases.filter(
-              (candidate) => candidate.tag_name === process.env.TAG_NAME,
-            );
-            for (const release of matches) {
-              await github.rest.repos.deleteRelease({
+            const listMatches = async () => {
+              const releases = await github.paginate(github.rest.repos.listReleases, {
                 owner,
                 repo,
-                release_id: release.id,
+                per_page: 100,
               });
+              return releases.filter(
+                (candidate) => candidate.tag_name === process.env.TAG_NAME,
+              );
+            };
+            const matches = await listMatches();
+            const releaseIds = new Set(matches.map((release) => release.id));
+            if (process.env.OUTPUT_RELEASE_ID) {
+              releaseIds.add(Number(process.env.OUTPUT_RELEASE_ID));
+            }
+            for (const releaseId of releaseIds) {
+              try {
+                await github.rest.repos.deleteRelease({
+                  owner,
+                  repo,
+                  release_id: releaseId,
+                });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
             }
             await deleteTagIfExists({
-              github,
               owner,
               repo,
+              github,
               tag: process.env.TAG_NAME,
             });
 
-            const remaining = await github.paginate(github.rest.repos.listReleases, {
-              owner,
-              repo,
-              per_page: 100,
-            });
-            if (remaining.some((release) => release.tag_name === process.env.TAG_NAME)) {
+            let remaining = await listMatches();
+            for (let attempt = 1; remaining.length > 0 && attempt <= 5; attempt += 1) {
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+              remaining = await listMatches();
+            }
+            if (remaining.length > 0) {
               core.setFailed(`release cleanup failed for ${process.env.TAG_NAME}`);
             }
