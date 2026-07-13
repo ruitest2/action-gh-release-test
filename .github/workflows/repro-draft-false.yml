@@ -20,6 +20,14 @@ on:
           - success
           - failure
         default: success
+      expected_existing_draft_behavior:
+        description: Whether all existing-draft scenarios should satisfy the fixed lifecycle
+        required: true
+        type: choice
+        options:
+          - fixed
+          - broken
+        default: fixed
 
 permissions:
   contents: write
@@ -142,3 +150,377 @@ jobs:
                 throw error;
               }
             }
+
+  existing-draft:
+    name: existing draft (${{ matrix.scenario }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          - omitted
+          - 'null'
+          - 'false'
+          - 'true'
+    env:
+      TAG_NAME: issue795-${{ matrix.scenario }}-${{ github.run_id }}-${{ github.run_attempt }}
+      ASSET_NAME: issue-795-${{ matrix.scenario }}.txt
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Prepare scenario asset
+        run: |
+          printf 'issue 795 %s %s\n' '${{ matrix.scenario }}' "$TAG_NAME" > "$ASSET_NAME"
+
+      - name: Seed draft release
+        id: seed
+        uses: actions/github-script@v8
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const { data: release } = await github.rest.repos.createRelease({
+              owner,
+              repo,
+              tag_name: process.env.TAG_NAME,
+              name: `Issue 795 ${process.env.SCENARIO}`,
+              target_commitish: context.sha,
+              draft: true,
+              prerelease: false,
+            });
+            core.setOutput("release_id", String(release.id));
+
+      - name: Record seeded draft visibility
+        id: visibility
+        uses: actions/github-script@v8
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            let directStatus = 200;
+            try {
+              await github.rest.repos.getReleaseByTag({ owner, repo, tag: process.env.TAG_NAME });
+            } catch (error) {
+              directStatus = error.status ?? 0;
+            }
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const listedCount = releases.filter(
+              (release) => release.tag_name === process.env.TAG_NAME,
+            ).length;
+            core.setOutput("direct_status", String(directStatus));
+            core.setOutput("listed_count", String(listedCount));
+
+      - name: Publish existing draft with omitted input
+        id: release_omitted
+        if: matrix.scenario == 'omitted'
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          prerelease: true
+          files: ${{ env.ASSET_NAME }}
+
+      - name: Publish existing draft with null expression
+        id: release_null
+        if: matrix.scenario == 'null'
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          draft: ${{ null }}
+          prerelease: true
+          files: ${{ env.ASSET_NAME }}
+
+      - name: Publish existing draft with explicit false
+        id: release_false
+        if: matrix.scenario == 'false'
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          draft: false
+          prerelease: true
+          files: ${{ env.ASSET_NAME }}
+
+      - name: Retain existing draft with explicit true
+        id: release_true
+        if: matrix.scenario == 'true'
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          draft: true
+          prerelease: true
+          files: ${{ env.ASSET_NAME }}
+
+      - name: Assert existing draft lifecycle
+        if: always()
+        uses: actions/github-script@v8
+        env:
+          ACTION_REPOSITORY: ${{ inputs.action_repository }}
+          ACTION_REF: ${{ inputs.action_ref }}
+          ASSET_NAME: ${{ env.ASSET_NAME }}
+          EXPECTED_BEHAVIOR: ${{ inputs.expected_existing_draft_behavior }}
+          INITIAL_RELEASE_ID: ${{ steps.seed.outputs.release_id }}
+          LISTED_DRAFT_COUNT: ${{ steps.visibility.outputs.listed_count }}
+          DIRECT_DRAFT_STATUS: ${{ steps.visibility.outputs.direct_status }}
+          NULL_DRAFT_VALUE: ${{ null }}
+          OMITTED_OUTCOME: ${{ steps.release_omitted.outcome }}
+          NULL_OUTCOME: ${{ steps.release_null.outcome }}
+          FALSE_OUTCOME: ${{ steps.release_false.outcome }}
+          TRUE_OUTCOME: ${{ steps.release_true.outcome }}
+          OMITTED_ID: ${{ steps.release_omitted.outputs.id }}
+          NULL_ID: ${{ steps.release_null.outputs.id }}
+          FALSE_ID: ${{ steps.release_false.outputs.id }}
+          TRUE_ID: ${{ steps.release_true.outputs.id }}
+          OMITTED_URL: ${{ steps.release_omitted.outputs.url }}
+          NULL_URL: ${{ steps.release_null.outputs.url }}
+          FALSE_URL: ${{ steps.release_false.outputs.url }}
+          TRUE_URL: ${{ steps.release_true.outputs.url }}
+          SCENARIO: ${{ matrix.scenario }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const scenario = process.env.SCENARIO;
+            const selected = {
+              omitted: { outcome: process.env.OMITTED_OUTCOME, id: process.env.OMITTED_ID, url: process.env.OMITTED_URL },
+              null: { outcome: process.env.NULL_OUTCOME, id: process.env.NULL_ID, url: process.env.NULL_URL },
+              false: { outcome: process.env.FALSE_OUTCOME, id: process.env.FALSE_ID, url: process.env.FALSE_URL },
+              true: { outcome: process.env.TRUE_OUTCOME, id: process.env.TRUE_ID, url: process.env.TRUE_URL },
+            }[scenario];
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const matching = releases.filter((release) => release.tag_name === process.env.TAG_NAME);
+            const release = matching.find(
+              (candidate) => String(candidate.id) === process.env.INITIAL_RELEASE_ID,
+            );
+            const expectedDraft = scenario === "true";
+            const assetNames = release?.assets.map((asset) => asset.name) ?? [];
+
+            let directReleaseId = null;
+            let directReleaseStatus = 200;
+            try {
+              const response = await github.rest.repos.getReleaseByTag({
+                owner,
+                repo,
+                tag: process.env.TAG_NAME,
+              });
+              directReleaseId = response.data.id;
+            } catch (error) {
+              directReleaseStatus = error.status ?? 0;
+            }
+
+            let tagRef = null;
+            let tagTarget = null;
+            try {
+              const response = await github.rest.git.getRef({
+                owner,
+                repo,
+                ref: `tags/${process.env.TAG_NAME}`,
+              });
+              tagRef = response.data.ref;
+              tagTarget = response.data.object.sha;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            const fixedState =
+              selected?.outcome === "success" &&
+              matching.length === 1 &&
+              String(release?.id) === process.env.INITIAL_RELEASE_ID &&
+              selected?.id === process.env.INITIAL_RELEASE_ID &&
+              selected?.url === release?.html_url &&
+              release?.draft === expectedDraft &&
+              release?.prerelease === true &&
+              assetNames.includes(process.env.ASSET_NAME) &&
+              (expectedDraft
+                ? tagRef === null
+                : directReleaseId === release?.id &&
+                  tagRef === `refs/tags/${process.env.TAG_NAME}` &&
+                  tagTarget === context.sha);
+
+            const summary = {
+              scenario,
+              action_repository: process.env.ACTION_REPOSITORY,
+              action_ref: process.env.ACTION_REF,
+              expected_behavior: process.env.EXPECTED_BEHAVIOR,
+              initial_release_id: Number(process.env.INITIAL_RELEASE_ID),
+              final_release_id: release?.id ?? null,
+              action_output_id: selected?.id || null,
+              action_output_url: selected?.url || null,
+              matching_release_count: matching.length,
+              matching_release_ids: matching.map((candidate) => candidate.id),
+              draft: release?.draft ?? null,
+              prerelease: release?.prerelease ?? null,
+              asset_names: assetNames,
+              tag_ref: tagRef,
+              tag_target: tagTarget,
+              release_step_outcome: selected?.outcome ?? null,
+              seeded_get_release_by_tag_status: Number(process.env.DIRECT_DRAFT_STATUS),
+              seeded_listed_release_count: Number(process.env.LISTED_DRAFT_COUNT),
+              null_input_value: scenario === "null" ? process.env.NULL_DRAFT_VALUE : undefined,
+              final_get_release_by_tag_status: directReleaseStatus,
+              fixed_state: fixedState,
+            };
+
+            await core.summary
+              .addHeading(`Issue 795 ${scenario} summary`)
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+            core.info(`ISSUE_795_RESULT=${JSON.stringify(summary)}`);
+
+            if (process.env.EXPECTED_BEHAVIOR === "fixed" && !fixedState) {
+              core.setFailed(`existing draft ${scenario} scenario did not satisfy the fixed lifecycle`);
+            }
+            if (process.env.EXPECTED_BEHAVIOR === "broken" && fixedState) {
+              core.setFailed(`existing draft ${scenario} scenario unexpectedly satisfied the fixed lifecycle`);
+            }
+
+      - name: Cleanup scenario releases and tag
+        if: always()
+        uses: actions/github-script@v8
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const listMatchingReleases = async () => {
+              const releases = await github.paginate(github.rest.repos.listReleases, {
+                owner,
+                repo,
+                per_page: 100,
+              });
+              return releases.filter((release) => release.tag_name === process.env.TAG_NAME);
+            };
+            const isMissingRef = (error) =>
+              error.status === 404 ||
+              (error.status === 422 &&
+                /Reference does not exist/i.test(
+                  error.response?.data?.message ?? error.message,
+                ));
+
+            let remaining = [];
+            for (let attempt = 1; attempt <= 5; attempt += 1) {
+              remaining = await listMatchingReleases();
+              if (remaining.length === 0) break;
+
+              for (const release of remaining) {
+                try {
+                  await github.rest.repos.deleteRelease({ owner, repo, release_id: release.id });
+                } catch (error) {
+                  if (error.status !== 404) throw error;
+                }
+              }
+
+              if (attempt < 5) {
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+              }
+            }
+
+            try {
+              await github.rest.git.deleteRef({
+                owner,
+                repo,
+                ref: `tags/${process.env.TAG_NAME}`,
+              });
+            } catch (error) {
+              if (!isMissingRef(error)) throw error;
+            }
+
+
+  verify-cleanup:
+    name: verify existing-draft cleanup
+    if: always()
+    needs:
+      - existing-draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove and verify all scenario releases and tags
+        uses: actions/github-script@v8
+        env:
+          TAG_SUFFIX: ${{ github.run_id }}-${{ github.run_attempt }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const scenarios = ["omitted", "null", "false", "true"];
+            const tags = scenarios.map(
+              (scenario) => `issue795-${scenario}-${process.env.TAG_SUFFIX}`,
+            );
+            const listMatchingReleases = async () => {
+              const releases = await github.paginate(github.rest.repos.listReleases, {
+                owner,
+                repo,
+                per_page: 100,
+              });
+              return releases.filter((release) => tags.includes(release.tag_name));
+            };
+            const isMissingRef = (error) =>
+              error.status === 404 ||
+              (error.status === 422 &&
+                /Reference does not exist/i.test(
+                  error.response?.data?.message ?? error.message,
+                ));
+
+            let remaining = [];
+            for (let attempt = 1; attempt <= 10; attempt += 1) {
+              remaining = await listMatchingReleases();
+              for (const release of remaining) {
+                try {
+                  await github.rest.repos.deleteRelease({ owner, repo, release_id: release.id });
+                } catch (error) {
+                  if (error.status !== 404) throw error;
+                }
+              }
+
+              for (const tag of tags) {
+                try {
+                  await github.rest.git.deleteRef({ owner, repo, ref: `tags/${tag}` });
+                } catch (error) {
+                  if (!isMissingRef(error)) throw error;
+                }
+              }
+
+              if (remaining.length === 0) break;
+              if (attempt < 10) {
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+              }
+            }
+
+            remaining = await listMatchingReleases();
+            if (remaining.length !== 0) {
+              throw new Error(
+                `cleanup left releases ${remaining.map((release) => release.id).join(", ")}`,
+              );
+            }
+
+            for (const tag of tags) {
+              try {
+                await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
+                throw new Error(`cleanup left tag ${tag}`);
+              } catch (error) {
+                if (!isMissingRef(error)) throw error;
+              }
+            }
+            core.info(`ISSUE_795_CLEANUP=${JSON.stringify({ tags, releases: [] })}`);

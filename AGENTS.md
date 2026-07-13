@@ -62,7 +62,7 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
   Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow intentionally sets `GITHUB_TOKEN` and expects the explicit `token` input to win, then cleans up both the test release and the matching remote tag.
 - Use `.github/workflows/repro-existing-draft.yml` for existing-draft reuse and draft-state behavior (`#163`, PR `#245`).
   Pass `draft_mode: keep` to verify the release stays draft, or `draft_mode: publish` to verify the seeded draft is reused and then published when `draft` is omitted.
-- Use `.github/workflows/repro-draft-false.yml` for `draft: false` behavior when creating prereleases outside a tag-triggered job (`#253`, `#379`).
+- Use `.github/workflows/repro-draft-false.yml` for `draft: false` behavior when creating prereleases outside a tag-triggered job (`#253`, `#379`) and for the four existing-draft prerelease transitions in upstream issue `#795` (omitted, null-expression, explicit false, and explicit true).
   For immutable-release verification (`#641`), enable immutable releases on this repo, run `repro-draft-false.yml` with `expected_release_outcome: failure`, and pair it with `repro-existing-draft.yml` in `draft_mode: publish` to confirm the failure is limited to brand-new prereleases. The local maintainer toggle is `gh api -H 'X-GitHub-Api-Version: 2022-11-28' -X PUT repos/ruitest2/action-gh-release-test/immutable-releases` to enable and the matching `-X DELETE` call to disable.
 - Use `.github/workflows/repro-omit-name.yml` for omitted-name update behavior against an existing tagged release (`#363`).
 - Use `.github/workflows/repro-existing-release-ref-tag.yml` for `tag_name: refs/tags/...` update behavior (`#403`).
