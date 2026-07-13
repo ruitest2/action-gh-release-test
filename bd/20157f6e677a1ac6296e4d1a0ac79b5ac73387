@@ -1,0 +1,83 @@
+.github/workflows/repro-release-discussion.yml
+  s_781304debb879a::t_8a05f2094ba409 15
+.github/workflows/repro-blocked-tag.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-token-precedence.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-assets-output.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-assets-output-windows.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-windows-glob.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-existing-release-ref-tag.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/trigger-prerelease.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-omit-name.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-home-tilde.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-body-too-long.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-existing-draft.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+AGENTS.md
+  s_781304debb879a::t_8a05f2094ba409 10,13,24,28,35
+.github/workflows/repro-previous-tag-release-notes.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-brace-glob.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-dotfile.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-make-latest.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/e2e.yml
+  s_781304debb879a::t_8a05f2094ba409 20,64,122
+.github/workflows/repro-many-files.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-duplicate-asset.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-preserve-order.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-draft-false.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-race.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-target-commitish.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-empty-token.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-finalize-race.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-unicode-asset.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+TESTS.md
+  s_781304debb879a::t_8a05f2094ba409 10,20
+.github/workflows/repro-windows.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-dm-asset.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-append-body.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+.github/workflows/repro-remote-repo.yml
+  s_781304debb879a::t_8a05f2094ba409 16
+.github/workflows/repro-paren-asset.yml
+  s_781304debb879a::t_8a05f2094ba409 14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "bd20157f6e677a1ac6296e4d1a0ac79b5ac73387",
+  "prompts": {},
+  "sessions": {
+    "s_781304debb879a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5904-3fac-7822-8d15-c1beb0507927",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
