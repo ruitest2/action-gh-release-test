@@ -139,6 +139,17 @@ jobs:
                 throw error;
               }
             }
+            try {
+              await github.request("DELETE /repos/{owner}/{repo}/git/refs/{ref}", {
+                owner,
+                repo,
+                ref: `tags/${process.env.TAG_NAME}`,
+              });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
 
   existing-draft:
     name: existing draft (${{ matrix.scenario }})
@@ -437,28 +448,79 @@ jobs:
               if (!isMissingRef(error)) throw error;
             }
 
-            remaining = await listMatchingReleases();
-            if (remaining.length !== 0) {
-              throw new Error(`cleanup left ${remaining.length} matching releases`);
-            }
-            try {
-              await github.rest.git.getRef({
+
+  verify-cleanup:
+    name: verify existing-draft cleanup
+    if: always()
+    needs:
+      - existing-draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove and verify all scenario releases and tags
+        uses: actions/github-script@v8
+        env:
+          TAG_SUFFIX: ${{ github.run_id }}-${{ github.run_attempt }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const scenarios = ["omitted", "null", "false", "true"];
+            const tags = scenarios.map(
+              (scenario) => `issue795-${scenario}-${process.env.TAG_SUFFIX}`,
+            );
+            const listMatchingReleases = async () => {
+              const releases = await github.paginate(github.rest.repos.listReleases, {
                 owner,
                 repo,
-                ref: `tags/${process.env.TAG_NAME}`,
+                per_page: 100,
               });
-              throw new Error("cleanup left the generated tag ref");
-            } catch (error) {
-              if (!isMissingRef(error)) throw error;
-            }
-            try {
-              await github.request("DELETE /repos/{owner}/{repo}/git/refs/{ref}", {
-                owner,
-                repo,
-                ref: `tags/${process.env.TAG_NAME}`,
-              });
-            } catch (error) {
-              if (error.status !== 404) {
-                throw error;
+              return releases.filter((release) => tags.includes(release.tag_name));
+            };
+            const isMissingRef = (error) =>
+              error.status === 404 ||
+              (error.status === 422 &&
+                /Reference does not exist/i.test(
+                  error.response?.data?.message ?? error.message,
+                ));
+
+            let remaining = [];
+            for (let attempt = 1; attempt <= 10; attempt += 1) {
+              remaining = await listMatchingReleases();
+              for (const release of remaining) {
+                try {
+                  await github.rest.repos.deleteRelease({ owner, repo, release_id: release.id });
+                } catch (error) {
+                  if (error.status !== 404) throw error;
+                }
+              }
+
+              for (const tag of tags) {
+                try {
+                  await github.rest.git.deleteRef({ owner, repo, ref: `tags/${tag}` });
+                } catch (error) {
+                  if (!isMissingRef(error)) throw error;
+                }
+              }
+
+              if (remaining.length === 0) break;
+              if (attempt < 10) {
+                await new Promise((resolve) => setTimeout(resolve, 2000));
               }
             }
+
+            remaining = await listMatchingReleases();
+            if (remaining.length !== 0) {
+              throw new Error(
+                `cleanup left releases ${remaining.map((release) => release.id).join(", ")}`,
+              );
+            }
+
+            for (const tag of tags) {
+              try {
+                await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
+                throw new Error(`cleanup left tag ${tag}`);
+              } catch (error) {
+                if (!isMissingRef(error)) throw error;
+              }
+            }
+            core.info(`ISSUE_795_CLEANUP=${JSON.stringify({ tags, releases: [] })}`);
