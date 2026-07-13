@@ -12,6 +12,16 @@ on:
         description: Action ref to test
         required: true
         default: v3.0.2
+      run_case:
+        description: Release lifecycle to exercise
+        required: true
+        type: choice
+        options:
+          - all
+          - new-prerelease
+          - existing-draft
+          - retag-existing-release
+        default: all
       expected_release_outcome:
         description: Whether the release step should succeed or fail
         required: true
@@ -28,12 +38,31 @@ on:
           - fixed
           - broken
         default: fixed
+      expected_retag_behavior:
+        description: Expected moving-tag release behavior
+        required: true
+        type: choice
+        options:
+          - fixed
+          - broken
+          - observe
+        default: fixed
+      retag_iterations:
+        description: Number of moving-tag iterations
+        required: true
+        type: choice
+        options:
+          - "1"
+          - "4"
+          - "8"
+        default: "1"
 
 permissions:
   contents: write
 
 jobs:
   repro:
+    if: inputs.run_case == 'all' || inputs.run_case == 'new-prerelease'
     runs-on: ubuntu-latest
     env:
       TAG_NAME: prerelease-${{ github.run_id }}-${{ github.run_attempt }}
@@ -152,6 +181,7 @@ jobs:
             }
 
   existing-draft:
+    if: inputs.run_case == 'all' || inputs.run_case == 'existing-draft'
     name: existing draft (${{ matrix.scenario }})
     runs-on: ubuntu-latest
     strategy:
@@ -451,7 +481,9 @@ jobs:
 
   verify-cleanup:
     name: verify existing-draft cleanup
-    if: always()
+    if: >-
+      always() &&
+      (inputs.run_case == 'all' || inputs.run_case == 'existing-draft')
     needs:
       - existing-draft
     runs-on: ubuntu-latest
@@ -524,3 +556,470 @@ jobs:
               }
             }
             core.info(`ISSUE_795_CLEANUP=${JSON.stringify({ tags, releases: [] })}`);
+
+  retag-existing-release:
+    name: retag existing release (${{ matrix.slot }})
+    if: inputs.run_case == 'all' || inputs.run_case == 'retag-existing-release'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        slot: [1, 2, 3, 4, 5, 6, 7, 8]
+    env:
+      ASSET_NAME: issue-772-asset.txt
+      TAG_NAME: issue772-${{ matrix.slot }}-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Enable requested iteration
+        id: guard
+        env:
+          ITERATIONS: ${{ inputs.retag_iterations }}
+          SLOT: ${{ matrix.slot }}
+        run: |
+          if [ "$SLOT" -le "$ITERATIONS" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out harness history
+        if: steps.guard.outputs.enabled == 'true'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Check out action under test
+        if: steps.guard.outputs.enabled == 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.action_repository }}
+          ref: ${{ inputs.action_ref }}
+          path: action-under-test
+
+      - name: Resolve old and new tag targets
+        if: steps.guard.outputs.enabled == 'true'
+        id: commits
+        run: |
+          echo "old_sha=$(git rev-parse HEAD~1)" >> "$GITHUB_OUTPUT"
+          echo "new_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Push moving tag at old commit
+        if: steps.guard.outputs.enabled == 'true'
+        env:
+          OLD_SHA: ${{ steps.commits.outputs.old_sha }}
+        run: |
+          git tag "$TAG_NAME" "$OLD_SHA"
+          git push origin "refs/tags/$TAG_NAME"
+
+      - name: Seed published prerelease and asset
+        if: steps.guard.outputs.enabled == 'true'
+        id: seed
+        uses: actions/github-script@v8
+        env:
+          ASSET_NAME: ${{ env.ASSET_NAME }}
+          OLD_SHA: ${{ steps.commits.outputs.old_sha }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const seedContent = `seed content ${process.env.TAG_NAME}\n`;
+            const { data: release } = await github.rest.repos.createRelease({
+              owner,
+              repo,
+              tag_name: process.env.TAG_NAME,
+              name: `Issue 772 seeded ${process.env.TAG_NAME}`,
+              body: `Seed body for ${process.env.TAG_NAME}`,
+              target_commitish: process.env.OLD_SHA,
+              draft: false,
+              prerelease: true,
+              make_latest: "false",
+            });
+            const uploadUrl = release.upload_url.replace("{?name,label}", "");
+            const endpoint = new URL(uploadUrl);
+            endpoint.searchParams.set("name", process.env.ASSET_NAME);
+            const payload = Buffer.from(seedContent, "utf8");
+            const response = await github.request({
+              method: "POST",
+              url: endpoint.toString(),
+              headers: {
+                "content-length": String(payload.length),
+                "content-type": "text/plain",
+              },
+              data: payload,
+            });
+            core.setOutput("release_id", String(release.id));
+            core.setOutput("release_url", release.html_url);
+            core.setOutput("seed_asset_id", String(response.data.id));
+            core.setOutput("seed_content", seedContent);
+
+      - name: Delete and recreate moving tag
+        if: steps.guard.outputs.enabled == 'true'
+        env:
+          NEW_SHA: ${{ steps.commits.outputs.new_sha }}
+        run: |
+          git push origin ":refs/tags/$TAG_NAME"
+          git tag -f "$TAG_NAME" "$NEW_SHA"
+          git push origin "refs/tags/$TAG_NAME"
+
+      - name: Record immediate release visibility
+        if: steps.guard.outputs.enabled == 'true'
+        id: visibility
+        uses: actions/github-script@v8
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            let directStatus = 200;
+            let directReleaseId = null;
+            try {
+              const response = await github.rest.repos.getReleaseByTag({
+                owner,
+                repo,
+                tag: process.env.TAG_NAME,
+              });
+              directReleaseId = response.data.id;
+            } catch (error) {
+              directStatus = error.status ?? 0;
+            }
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const matching = releases.filter(
+              (release) => release.tag_name === process.env.TAG_NAME,
+            );
+            core.setOutput("direct_status", String(directStatus));
+            core.setOutput("direct_release_id", directReleaseId ? String(directReleaseId) : "");
+            core.setOutput("listed_release_ids", matching.map((release) => release.id).join(","));
+            core.info(`ISSUE_772_VISIBILITY=${JSON.stringify({
+              tag_name: process.env.TAG_NAME,
+              direct_status: directStatus,
+              direct_release_id: directReleaseId,
+              listed_releases: matching.map((release) => ({
+                id: release.id,
+                draft: release.draft,
+                prerelease: release.prerelease,
+              })),
+            })}`);
+
+      - name: Prepare replacement asset
+        if: steps.guard.outputs.enabled == 'true'
+        run: |
+          printf 'replacement content %s\n' "$TAG_NAME" > "$ASSET_NAME"
+
+      - name: Update release after replacing tag
+        if: steps.guard.outputs.enabled == 'true'
+        id: release
+        continue-on-error: true
+        uses: ./action-under-test
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          draft: false
+          prerelease: true
+          make_latest: false
+          target_commitish: ${{ steps.commits.outputs.new_sha }}
+          name: Issue 772 updated ${{ env.TAG_NAME }}
+          body: Updated body for ${{ env.TAG_NAME }}
+          files: ${{ env.ASSET_NAME }}
+
+      - name: Inspect moving-tag result
+        if: always() && steps.guard.outputs.enabled == 'true'
+        uses: actions/github-script@v8
+        env:
+          ACTION_OUTPUT_ID: ${{ steps.release.outputs.id }}
+          ACTION_OUTPUT_URL: ${{ steps.release.outputs.url }}
+          ACTION_REF: ${{ inputs.action_ref }}
+          ACTION_REPOSITORY: ${{ inputs.action_repository }}
+          ASSET_NAME: ${{ env.ASSET_NAME }}
+          DIRECT_BEFORE_ID: ${{ steps.visibility.outputs.direct_release_id }}
+          DIRECT_BEFORE_STATUS: ${{ steps.visibility.outputs.direct_status }}
+          EXPECTED_BEHAVIOR: ${{ inputs.expected_retag_behavior }}
+          LISTED_BEFORE_IDS: ${{ steps.visibility.outputs.listed_release_ids }}
+          NEW_SHA: ${{ steps.commits.outputs.new_sha }}
+          OLD_SHA: ${{ steps.commits.outputs.old_sha }}
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+          RESULT_FILE: issue-772-result-${{ matrix.slot }}.json
+          SEED_ASSET_ID: ${{ steps.seed.outputs.seed_asset_id }}
+          SEED_RELEASE_ID: ${{ steps.seed.outputs.release_id }}
+          SEED_RELEASE_URL: ${{ steps.seed.outputs.release_url }}
+          SLOT: ${{ matrix.slot }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require("fs");
+            const { owner, repo } = context.repo;
+            const tagName = process.env.TAG_NAME;
+            const seedReleaseId = Number(process.env.SEED_RELEASE_ID);
+            const expectedContent = `replacement content ${tagName}\n`;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const matching = releases.filter((release) => release.tag_name === tagName);
+            const seededRelease = matching.find((release) => release.id === seedReleaseId);
+            let directStatus = 200;
+            let directRelease = null;
+            try {
+              directRelease = (
+                await github.rest.repos.getReleaseByTag({ owner, repo, tag: tagName })
+              ).data;
+            } catch (error) {
+              directStatus = error.status ?? 0;
+            }
+            let tagTarget = null;
+            try {
+              tagTarget = (
+                await github.rest.git.getRef({ owner, repo, ref: `tags/${tagName}` })
+              ).data.object.sha;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            const replacementAsset = seededRelease?.assets.find(
+              (asset) => asset.name === process.env.ASSET_NAME,
+            );
+            let downloadedContent = null;
+            if (replacementAsset) {
+              const response = await github.request({
+                method: "GET",
+                url: replacementAsset.url,
+                headers: { accept: "application/octet-stream" },
+              });
+              const data = response.data;
+              const buffer = Buffer.isBuffer(data)
+                ? data
+                : data instanceof ArrayBuffer
+                  ? Buffer.from(data)
+                  : ArrayBuffer.isView(data)
+                    ? Buffer.from(data.buffer, data.byteOffset, data.byteLength)
+                    : Buffer.from(String(data), "utf8");
+              downloadedContent = buffer.toString("utf8");
+            }
+            const fixedState =
+              process.env.RELEASE_OUTCOME === "success" &&
+              matching.length === 1 &&
+              seededRelease?.id === seedReleaseId &&
+              process.env.ACTION_OUTPUT_ID === String(seedReleaseId) &&
+              process.env.ACTION_OUTPUT_URL === seededRelease?.html_url &&
+              seededRelease?.draft === false &&
+              seededRelease?.prerelease === true &&
+              seededRelease?.name === `Issue 772 updated ${tagName}` &&
+              seededRelease?.body === `Updated body for ${tagName}` &&
+              seededRelease?.assets.length === 1 &&
+              downloadedContent === expectedContent &&
+              directRelease?.id === seedReleaseId &&
+              tagTarget === process.env.NEW_SHA;
+            const brokenState =
+              !fixedState &&
+              (process.env.RELEASE_OUTCOME === "failure" ||
+                matching.length !== 1 ||
+                process.env.ACTION_OUTPUT_ID !== String(seedReleaseId) ||
+                seededRelease?.draft === true ||
+                directRelease?.id !== seedReleaseId ||
+                downloadedContent !== expectedContent);
+            const summary = {
+              slot: Number(process.env.SLOT),
+              tag_name: tagName,
+              action_repository: process.env.ACTION_REPOSITORY,
+              action_ref: process.env.ACTION_REF,
+              expected_behavior: process.env.EXPECTED_BEHAVIOR,
+              old_sha: process.env.OLD_SHA,
+              new_sha: process.env.NEW_SHA,
+              initial_release_id: seedReleaseId,
+              initial_release_url: process.env.SEED_RELEASE_URL,
+              initial_asset_id: Number(process.env.SEED_ASSET_ID),
+              immediate_direct_status: Number(process.env.DIRECT_BEFORE_STATUS),
+              immediate_direct_release_id: process.env.DIRECT_BEFORE_ID
+                ? Number(process.env.DIRECT_BEFORE_ID)
+                : null,
+              immediate_listed_release_ids: process.env.LISTED_BEFORE_IDS
+                ? process.env.LISTED_BEFORE_IDS.split(",").map(Number)
+                : [],
+              action_outcome: process.env.RELEASE_OUTCOME,
+              action_output_id: process.env.ACTION_OUTPUT_ID || null,
+              action_output_url: process.env.ACTION_OUTPUT_URL || null,
+              final_direct_status: directStatus,
+              final_direct_release_id: directRelease?.id ?? null,
+              matching_release_count: matching.length,
+              releases: matching.map((release) => ({
+                id: release.id,
+                draft: release.draft,
+                prerelease: release.prerelease,
+                name: release.name,
+                body: release.body,
+                asset_ids: release.assets.map((asset) => asset.id),
+                asset_names: release.assets.map((asset) => asset.name),
+              })),
+              replacement_asset_id: replacementAsset?.id ?? null,
+              replacement_content_matches: downloadedContent === expectedContent,
+              tag_target: tagTarget,
+              fixed_state: fixedState,
+              broken_state: brokenState,
+              cleanup: null,
+            };
+            fs.writeFileSync(process.env.RESULT_FILE, `${JSON.stringify(summary, null, 2)}\n`);
+            await core.summary
+              .addHeading(`Issue 772 retag iteration ${process.env.SLOT}`)
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+            core.info(`ISSUE_772_RESULT=${JSON.stringify(summary)}`);
+            if (process.env.EXPECTED_BEHAVIOR === "fixed" && !fixedState) {
+              core.setFailed("retagged release did not satisfy the fixed lifecycle");
+            }
+
+      - name: Cleanup moving-tag release and tag
+        if: always() && steps.guard.outputs.enabled == 'true'
+        uses: actions/github-script@v8
+        env:
+          RESULT_FILE: issue-772-result-${{ matrix.slot }}.json
+          TAG_NAME: ${{ env.TAG_NAME }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require("fs");
+            const { owner, repo } = context.repo;
+            const tagName = process.env.TAG_NAME;
+            const listMatches = async () => {
+              const releases = await github.paginate(github.rest.repos.listReleases, {
+                owner,
+                repo,
+                per_page: 100,
+              });
+              return releases.filter((release) => release.tag_name === tagName);
+            };
+            const isMissingRef = (error) =>
+              error.status === 404 ||
+              (error.status === 422 &&
+                /Reference does not exist/i.test(
+                  error.response?.data?.message ?? error.message,
+                ));
+            let matches = await listMatches();
+            for (let attempt = 1; matches.length > 0 && attempt <= 10; attempt += 1) {
+              for (const release of matches) {
+                try {
+                  await github.rest.repos.deleteRelease({
+                    owner,
+                    repo,
+                    release_id: release.id,
+                  });
+                } catch (error) {
+                  if (error.status !== 404) throw error;
+                }
+              }
+              if (attempt < 10) {
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+              }
+              matches = await listMatches();
+            }
+            try {
+              await github.rest.git.deleteRef({ owner, repo, ref: `tags/${tagName}` });
+            } catch (error) {
+              if (!isMissingRef(error)) throw error;
+            }
+            const remainingReleases = await listMatches();
+            let tagExists = false;
+            try {
+              await github.rest.git.getRef({ owner, repo, ref: `tags/${tagName}` });
+              tagExists = true;
+            } catch (error) {
+              if (!isMissingRef(error)) throw error;
+            }
+            const cleanup = {
+              releases_remaining: remainingReleases.map((release) => release.id),
+              tag_exists: tagExists,
+              complete: remainingReleases.length === 0 && !tagExists,
+            };
+            const result = fs.existsSync(process.env.RESULT_FILE)
+              ? JSON.parse(fs.readFileSync(process.env.RESULT_FILE, "utf8"))
+              : { tag_name: tagName, fixed_state: false, broken_state: true };
+            result.cleanup = cleanup;
+            fs.writeFileSync(process.env.RESULT_FILE, `${JSON.stringify(result, null, 2)}\n`);
+            core.info(`ISSUE_772_CLEANUP=${JSON.stringify({ tag_name: tagName, ...cleanup })}`);
+            if (!cleanup.complete) {
+              core.setFailed(`cleanup incomplete for ${tagName}`);
+            }
+
+      - name: Upload moving-tag result
+        if: always() && steps.guard.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: issue-772-result-${{ matrix.slot }}
+          path: issue-772-result-${{ matrix.slot }}.json
+
+  summarize-retag-existing-release:
+    name: summarize retag existing release
+    if: >-
+      always() &&
+      (inputs.run_case == 'all' || inputs.run_case == 'retag-existing-release')
+    needs:
+      - retag-existing-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download moving-tag results
+        uses: actions/download-artifact@v8
+        with:
+          merge-multiple: true
+          path: issue-772-results
+          pattern: issue-772-result-*
+
+      - name: Aggregate moving-tag evidence
+        uses: actions/github-script@v8
+        env:
+          ACTION_REF: ${{ inputs.action_ref }}
+          ACTION_REPOSITORY: ${{ inputs.action_repository }}
+          EXPECTED_BEHAVIOR: ${{ inputs.expected_retag_behavior }}
+          EXPECTED_ITERATIONS: ${{ inputs.retag_iterations }}
+        with:
+          script: |
+            const fs = require("fs");
+            const path = require("path");
+            const resultDir = path.join(process.env.GITHUB_WORKSPACE, "issue-772-results");
+            const results = fs.readdirSync(resultDir)
+              .filter((file) => file.endsWith(".json"))
+              .sort((left, right) =>
+                Number(left.match(/(\d+)/)?.[1] ?? 0) - Number(right.match(/(\d+)/)?.[1] ?? 0),
+              )
+              .map((file) => JSON.parse(fs.readFileSync(path.join(resultDir, file), "utf8")));
+            const fixedCount = results.filter((result) => result.fixed_state).length;
+            const brokenCount = results.filter((result) => result.broken_state).length;
+            const cleanupCount = results.filter((result) => result.cleanup?.complete).length;
+            const summary = {
+              action_repository: process.env.ACTION_REPOSITORY,
+              action_ref: process.env.ACTION_REF,
+              expected_behavior: process.env.EXPECTED_BEHAVIOR,
+              expected_iterations: Number(process.env.EXPECTED_ITERATIONS),
+              observed_iterations: results.length,
+              fixed_count: fixedCount,
+              broken_count: brokenCount,
+              cleanup_count: cleanupCount,
+              tags: results.map((result) => result.tag_name),
+              initial_release_ids: results.map((result) => result.initial_release_id),
+              final_release_ids: results.map((result) => result.final_direct_release_id),
+              results,
+            };
+            await core.summary
+              .addHeading("Issue 772 moving-tag aggregate")
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+            core.info(`ISSUE_772_AGGREGATE=${JSON.stringify(summary)}`);
+            if (results.length !== Number(process.env.EXPECTED_ITERATIONS)) {
+              core.setFailed(
+                `expected ${process.env.EXPECTED_ITERATIONS} results, found ${results.length}`,
+              );
+              return;
+            }
+            if (cleanupCount !== results.length) {
+              core.setFailed("one or more moving-tag iterations did not clean up completely");
+              return;
+            }
+            if (process.env.EXPECTED_BEHAVIOR === "fixed" && fixedCount !== results.length) {
+              core.setFailed(`expected every iteration fixed, observed ${fixedCount}/${results.length}`);
+              return;
+            }
+            if (process.env.EXPECTED_BEHAVIOR === "broken" && brokenCount === 0) {
+              core.setFailed("expected at least one broken moving-tag iteration, observed none");
+            }
