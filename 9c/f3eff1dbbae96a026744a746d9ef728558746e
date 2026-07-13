@@ -1,0 +1,26 @@
+AGENTS.md
+  s_781304debb879a::t_8150e8e354a91f 80-81
+TESTS.md
+  s_781304debb879a::t_8150e8e354a91f 29
+scripts/gitea-overwrite-harness.sh
+  s_781304debb879a::t_6328d52a32b939 13,264-268
+  s_781304debb879a::t_1d3beb2c76cf9e 1-12,14-263,269
+.github/workflows/repro-gitea-overwrite.yml
+  s_781304debb879a::t_1d3beb2c76cf9e 1-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "9cf3eff1dbbae96a026744a746d9ef728558746e",
+  "prompts": {},
+  "sessions": {
+    "s_781304debb879a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5904-3fac-7822-8d15-c1beb0507927",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
