@@ -114,6 +114,18 @@ jobs:
               .addCodeBlock(JSON.stringify(summary, null, 2), "json")
               .write();
 
+            if (releaseOutcome !== "failure") {
+              core.setFailed(
+                `expected blocked tag creation to fail, got ${releaseOutcome}`,
+              );
+            }
+
+            if (matching.length !== 0) {
+              core.setFailed(
+                `expected no orphan releases for ${tagName}, found ${matching.length}`,
+              );
+            }
+
       - name: Cleanup temporary release and ruleset
         if: always()
         uses: actions/github-script@v8
