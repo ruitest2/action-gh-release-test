@@ -1,0 +1,25 @@
+TESTS.md
+  s_e2383fc11696b7::t_bbd8a44947b4df 28
+.github/workflows/repro-blocked-tag.yml
+  s_e2383fc11696b7::t_30cab1aae253f2 494
+  s_e2383fc11696b7::t_250dcdee129164 93-97
+  s_e2383fc11696b7::t_b28a4c5ae558d6 21-22,26,28-31,84-85,87-92,98-108,111,113,115-119,121-138,140-144,146-162,164-175,177-182,185-191,195-205,211-219,221-238,241-338,340-460,464-493,495-502
+AGENTS.md
+  s_e2383fc11696b7::t_bbd8a44947b4df 44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "fd6b8b2506103368eeccd4316530c4f54a047d1a",
+  "prompts": {},
+  "sessions": {
+    "s_e2383fc11696b7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6578-27a9-7582-940e-a14389e9ed7a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
