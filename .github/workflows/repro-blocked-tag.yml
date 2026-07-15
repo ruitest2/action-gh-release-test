@@ -18,11 +18,17 @@ on:
         default: ruitest2/action-gh-release-test
 
 permissions:
+  actions: read
+  checks: read
   contents: read
 
 jobs:
-  repro:
+  exercise:
     runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.result.outputs.release_id }}
+      release_outcome: ${{ steps.result.outputs.release_outcome }}
+      ruleset_id: ${{ steps.result.outputs.ruleset_id }}
     env:
       TAG_NAME: v722.${{ github.run_id }}.${{ github.run_attempt }}
       RELEASE_REPOSITORY: ${{ inputs.release_repository }}
@@ -75,98 +81,423 @@ jobs:
           token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
           files: blocked-tag.txt
 
-      - name: Summarize blocked tag outcome
-        id: inspect
+      - name: Capture exercise state
+        id: result
         if: always()
+        shell: bash
+        env:
+          RELEASE_ID: ${{ steps.release.outputs.id }}
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+          RULESET_ID: ${{ steps.ruleset.outputs.ruleset_id }}
+        run: |
+          {
+            printf 'release_id=%s\n' "${RELEASE_ID:-}"
+            printf 'release_outcome=%s\n' "${RELEASE_OUTCOME:-skipped}"
+            printf 'ruleset_id=%s\n' "${RULESET_ID:-}"
+          } >> "$GITHUB_OUTPUT"
+
+  verify-and-cleanup:
+    if: always()
+    needs: exercise
+    runs-on: ubuntu-latest
+    env:
+      TAG_NAME: v722.${{ github.run_id }}.${{ github.run_attempt }}
+      RELEASE_REPOSITORY: ${{ inputs.release_repository }}
+    steps:
+      - name: Find blocked-tag diagnostic
+        id: diagnostic
         uses: actions/github-script@v8
         with:
-          github-token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
+          github-token: ${{ github.token }}
           script: |
-            const [owner, repo] = process.env.RELEASE_REPOSITORY.split("/");
+            const { owner, repo } = context.repo;
             const tagName = process.env.TAG_NAME;
-            const releaseOutcome = "${{ steps.release.outcome }}";
-            const releases = await github.paginate(github.rest.repos.listReleases, {
-              owner,
-              repo,
-              per_page: 100,
-            });
-            const matching = releases.filter((release) => release.tag_name === tagName);
+            const escapedTag = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const diagnosticPattern = new RegExp(
+              `^Tag creation for ${escapedTag} is blocked by repository rules\\. ` +
+                `Deleted draft release (\\d+) to avoid leaving an orphaned draft release\\.$`,
+            );
 
-            const summary = {
-              tag_name: tagName,
-              repository: `${owner}/${repo}`,
-              step_outcome: releaseOutcome,
-              release_count: matching.length,
-              releases: matching.map((release) => ({
-                    id: release.id,
-                    draft: release.draft,
-                    prerelease: release.prerelease,
-                    published_at: release.published_at,
-                    html_url: release.html_url,
-                    asset_names: release.assets.map((asset) => asset.name),
-                  })),
-            };
+            let annotationCount = 0;
+            let checkRunId = "";
+            let deletedReleaseId = "";
+            let diagnosticMatched = false;
+            let diagnosticError = "";
 
-            core.setOutput("release_ids", JSON.stringify(matching.map((release) => release.id)));
+            try {
+              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                owner,
+                repo,
+                run_id: context.runId,
+                filter: "latest",
+                per_page: 100,
+              });
+              const exerciseJobs = jobs.filter((job) => job.name === "exercise");
+              if (exerciseJobs.length !== 1) {
+                throw new Error(`expected one completed exercise job, found ${exerciseJobs.length}`);
+              }
 
-            core.summary
-              .addHeading("Blocked tag repro summary")
-              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
-              .write();
+              const checkRunMatch = exerciseJobs[0].check_run_url?.match(/\/check-runs\/(\d+)$/);
+              if (!checkRunMatch) {
+                throw new Error("exercise job did not expose a check-run ID");
+              }
+              checkRunId = checkRunMatch[1];
 
-            if (releaseOutcome !== "failure") {
-              core.setFailed(
-                `expected blocked tag creation to fail, got ${releaseOutcome}`,
-              );
+              for (let attempt = 1; attempt <= 8; attempt += 1) {
+                const annotations = await github.paginate(github.rest.checks.listAnnotations, {
+                  owner,
+                  repo,
+                  check_run_id: Number(checkRunId),
+                  per_page: 100,
+                });
+                const matches = annotations
+                  .map((annotation) => ({
+                    annotation,
+                    match:
+                      typeof annotation.message === "string"
+                        ? annotation.message.match(diagnosticPattern)
+                        : null,
+                  }))
+                  .filter(({ match }) => match !== null);
+                annotationCount = matches.length;
+
+                if (matches.length > 1) {
+                  throw new Error(`expected one blocked-tag diagnostic, found ${matches.length}`);
+                }
+                if (matches.length === 1) {
+                  deletedReleaseId = matches[0].match[1];
+                  diagnosticMatched = true;
+                  break;
+                }
+                if (attempt < 8) {
+                  await new Promise((resolve) => setTimeout(resolve, 1000));
+                }
+              }
+
+              if (!diagnosticMatched) {
+                throw new Error("expected blocked-tag diagnostic was not found");
+              }
+            } catch (error) {
+              diagnosticError = error instanceof Error ? error.message : String(error);
+              core.setFailed(diagnosticError);
             }
 
-            if (matching.length !== 0) {
-              core.setFailed(
-                `expected no orphan releases for ${tagName}, found ${matching.length}`,
-              );
-            }
+            core.setOutput("annotation_count", String(annotationCount));
+            core.setOutput("check_run_id", checkRunId);
+            core.setOutput("deleted_release_id", deletedReleaseId);
+            core.setOutput("diagnostic_error", diagnosticError);
+            core.setOutput("diagnostic_matched", String(diagnosticMatched));
 
-      - name: Cleanup temporary release and ruleset
+      - name: Verify blocked-tag state and clean up
         if: always()
         uses: actions/github-script@v8
         env:
-          RELEASE_IDS: ${{ steps.inspect.outputs.release_ids }}
-          RULESET_ID: ${{ steps.ruleset.outputs.ruleset_id }}
+          ACTION_REF: ${{ inputs.action_ref }}
+          ACTION_REPOSITORY: ${{ inputs.action_repository }}
+          ACTION_RELEASE_ID: ${{ needs.exercise.outputs.release_id }}
+          ANNOTATION_COUNT: ${{ steps.diagnostic.outputs.annotation_count }}
+          CHECK_RUN_ID: ${{ steps.diagnostic.outputs.check_run_id }}
+          DELETED_RELEASE_ID: ${{ steps.diagnostic.outputs.deleted_release_id }}
+          DIAGNOSTIC_ERROR: ${{ steps.diagnostic.outputs.diagnostic_error }}
+          DIAGNOSTIC_MATCHED: ${{ steps.diagnostic.outputs.diagnostic_matched }}
+          EXERCISE_RESULT: ${{ needs.exercise.result }}
+          RELEASE_OUTCOME: ${{ needs.exercise.outputs.release_outcome }}
+          RULESET_ID: ${{ needs.exercise.outputs.ruleset_id }}
         with:
           github-token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
           script: |
             const [owner, repo] = process.env.RELEASE_REPOSITORY.split("/");
-            const releaseIds = JSON.parse(process.env.RELEASE_IDS || "[]");
-            const rulesetId = process.env.RULESET_ID;
             const tagName = process.env.TAG_NAME;
+            const statusOf = (error) =>
+              typeof error?.status === "number"
+                ? error.status
+                : typeof error?.response?.status === "number"
+                  ? error.response.status
+                  : undefined;
+            const messageOf = (error) =>
+              error instanceof Error ? error.message : String(error);
+            const numericId = (value) => (/^\d+$/.test(value || "") ? Number(value) : undefined);
 
-            for (const releaseId of releaseIds) {
-              await github.rest.repos.deleteRelease({
-                owner,
-                repo,
-                release_id: Number(releaseId),
-              });
-              core.info(`deleted release ${releaseId}`);
-            }
+            const verificationErrors = [];
+            const cleanupErrors = [];
+            const cleanupOperations = [];
+            const releaseIds = new Set();
+            const diagnosticReleaseId = numericId(process.env.DELETED_RELEASE_ID);
+            const actionReleaseId = numericId(process.env.ACTION_RELEASE_ID);
+            const rulesetId = numericId(process.env.RULESET_ID);
+            if (diagnosticReleaseId !== undefined) releaseIds.add(diagnosticReleaseId);
+            if (actionReleaseId !== undefined) releaseIds.add(actionReleaseId);
+
+            let directReleaseLookupStatus = "not-run";
+            const releaseListObservations = [];
+            let matchingReleases = [];
+            let consecutiveEmptyReads = 0;
+            let tagLookupStatus = "not-run";
+            let postCleanupTagStatus = "not-run";
+            let postCleanupRulesetStatus = rulesetId === undefined ? "not-created" : "not-run";
+            const postCleanupReleaseStatuses = {};
 
             try {
-              await github.request("DELETE /repos/{owner}/{repo}/git/refs/{ref}", {
-                owner,
-                repo,
-                ref: `tags/${tagName}`,
-              });
-              core.info(`deleted tag ${tagName}`);
+              if (process.env.EXERCISE_RESULT !== "success") {
+                verificationErrors.push(
+                  `exercise job did not complete successfully: ${process.env.EXERCISE_RESULT}`,
+                );
+              }
+              if (process.env.RELEASE_OUTCOME !== "failure") {
+                verificationErrors.push(
+                  `expected release outcome failure, got ${process.env.RELEASE_OUTCOME || "missing"}`,
+                );
+              }
+              if (process.env.DIAGNOSTIC_MATCHED !== "true") {
+                verificationErrors.push(
+                  `expected blocked-tag diagnostic did not match: ${process.env.DIAGNOSTIC_ERROR || "no diagnostic"}`,
+                );
+              }
+              if (diagnosticReleaseId === undefined) {
+                verificationErrors.push("blocked-tag diagnostic did not provide a numeric release ID");
+              }
+              if (rulesetId === undefined) {
+                verificationErrors.push("exercise job did not provide a numeric ruleset ID");
+              }
+
+              if (diagnosticReleaseId !== undefined) {
+                try {
+                  await github.rest.repos.getRelease({
+                    owner,
+                    repo,
+                    release_id: diagnosticReleaseId,
+                  });
+                  directReleaseLookupStatus = 200;
+                  verificationErrors.push(
+                    `release ${diagnosticReleaseId} still exists after blocked-tag cleanup`,
+                  );
+                } catch (error) {
+                  const status = statusOf(error);
+                  directReleaseLookupStatus = status ?? "unknown";
+                  if (status !== 404) {
+                    verificationErrors.push(
+                      `direct release lookup returned ${status ?? "unknown"}: ${messageOf(error)}`,
+                    );
+                  }
+                }
+              }
+
+              for (let attempt = 1; attempt <= 4; attempt += 1) {
+                try {
+                  const releases = await github.paginate(github.rest.repos.listReleases, {
+                    owner,
+                    repo,
+                    per_page: 100,
+                  });
+                  matchingReleases = releases.filter((release) => release.tag_name === tagName);
+                  for (const release of matchingReleases) releaseIds.add(release.id);
+                  releaseListObservations.push({
+                    attempt,
+                    count: matchingReleases.length,
+                    releases: matchingReleases.map((release) => ({
+                      id: release.id,
+                      draft: release.draft,
+                      prerelease: release.prerelease,
+                    })),
+                  });
+                  consecutiveEmptyReads =
+                    matchingReleases.length === 0 ? consecutiveEmptyReads + 1 : 0;
+                } catch (error) {
+                  releaseListObservations.push({
+                    attempt,
+                    error: messageOf(error),
+                    status: statusOf(error) ?? "unknown",
+                  });
+                  verificationErrors.push(
+                    `release-list verification failed: ${messageOf(error)}`,
+                  );
+                  break;
+                }
+                if (attempt < 4) {
+                  await new Promise((resolve) => setTimeout(resolve, 1000));
+                }
+              }
+              if (consecutiveEmptyReads < 2 || matchingReleases.length !== 0) {
+                verificationErrors.push(
+                  `expected two consecutive empty release-list reads, got ${consecutiveEmptyReads}`,
+                );
+              }
+
+              try {
+                await github.rest.git.getRef({ owner, repo, ref: `tags/${tagName}` });
+                tagLookupStatus = 200;
+                verificationErrors.push(`temporary tag ${tagName} still exists`);
+              } catch (error) {
+                const status = statusOf(error);
+                tagLookupStatus = status ?? "unknown";
+                if (status !== 404) {
+                  verificationErrors.push(
+                    `tag lookup returned ${status ?? "unknown"}: ${messageOf(error)}`,
+                  );
+                }
+              }
             } catch (error) {
-              if (error.status !== 404 && error.status !== 422) {
-                throw error;
+              verificationErrors.push(`unexpected verification failure: ${messageOf(error)}`);
+            } finally {
+              try {
+                const releases = await github.paginate(github.rest.repos.listReleases, {
+                  owner,
+                  repo,
+                  per_page: 100,
+                });
+                for (const release of releases) {
+                  if (release.tag_name === tagName) releaseIds.add(release.id);
+                }
+              } catch (error) {
+                cleanupErrors.push(`cleanup release listing failed: ${messageOf(error)}`);
+              }
+
+              for (const releaseId of [...releaseIds].sort((left, right) => left - right)) {
+                try {
+                  await github.rest.repos.getRelease({ owner, repo, release_id: releaseId });
+                  await github.rest.repos.deleteRelease({ owner, repo, release_id: releaseId });
+                  cleanupOperations.push({ resource: `release:${releaseId}`, result: "deleted" });
+                } catch (error) {
+                  const status = statusOf(error);
+                  if (status === 404) {
+                    cleanupOperations.push({
+                      resource: `release:${releaseId}`,
+                      result: "already-absent",
+                    });
+                  } else {
+                    cleanupErrors.push(
+                      `cleanup failed for release ${releaseId}: ${messageOf(error)}`,
+                    );
+                  }
+                }
+              }
+
+              try {
+                await github.rest.git.deleteRef({ owner, repo, ref: `tags/${tagName}` });
+                cleanupOperations.push({ resource: `tag:${tagName}`, result: "deleted" });
+              } catch (error) {
+                const status = statusOf(error);
+                if (status === 404 || status === 422) {
+                  cleanupOperations.push({
+                    resource: `tag:${tagName}`,
+                    result: "already-absent",
+                  });
+                } else {
+                  cleanupErrors.push(`tag cleanup failed: ${messageOf(error)}`);
+                }
+              }
+
+              if (rulesetId !== undefined) {
+                try {
+                  await github.request("DELETE /repos/{owner}/{repo}/rulesets/{ruleset_id}", {
+                    owner,
+                    repo,
+                    ruleset_id: rulesetId,
+                  });
+                  cleanupOperations.push({
+                    resource: `ruleset:${rulesetId}`,
+                    result: "deleted",
+                  });
+                } catch (error) {
+                  if (statusOf(error) === 404) {
+                    cleanupOperations.push({
+                      resource: `ruleset:${rulesetId}`,
+                      result: "already-absent",
+                    });
+                  } else {
+                    cleanupErrors.push(`ruleset cleanup failed: ${messageOf(error)}`);
+                  }
+                }
+              } else {
+                cleanupOperations.push({ resource: "ruleset", result: "not-created" });
+              }
+
+              for (const releaseId of [...releaseIds].sort((left, right) => left - right)) {
+                try {
+                  await github.rest.repos.getRelease({ owner, repo, release_id: releaseId });
+                  postCleanupReleaseStatuses[releaseId] = 200;
+                  cleanupErrors.push(`release ${releaseId} still exists after cleanup`);
+                } catch (error) {
+                  const status = statusOf(error);
+                  postCleanupReleaseStatuses[releaseId] = status ?? "unknown";
+                  if (status !== 404) {
+                    cleanupErrors.push(
+                      `post-cleanup release ${releaseId} lookup failed: ${messageOf(error)}`,
+                    );
+                  }
+                }
+              }
+
+              try {
+                await github.rest.git.getRef({ owner, repo, ref: `tags/${tagName}` });
+                postCleanupTagStatus = 200;
+                cleanupErrors.push(`tag ${tagName} still exists after cleanup`);
+              } catch (error) {
+                const status = statusOf(error);
+                postCleanupTagStatus = status ?? "unknown";
+                if (status !== 404) {
+                  cleanupErrors.push(`post-cleanup tag lookup failed: ${messageOf(error)}`);
+                }
+              }
+
+              if (rulesetId !== undefined) {
+                try {
+                  await github.request("GET /repos/{owner}/{repo}/rulesets/{ruleset_id}", {
+                    owner,
+                    repo,
+                    ruleset_id: rulesetId,
+                  });
+                  postCleanupRulesetStatus = 200;
+                  cleanupErrors.push(`ruleset ${rulesetId} still exists after cleanup`);
+                } catch (error) {
+                  const status = statusOf(error);
+                  postCleanupRulesetStatus = status ?? "unknown";
+                  if (status !== 404) {
+                    cleanupErrors.push(
+                      `post-cleanup ruleset lookup failed: ${messageOf(error)}`,
+                    );
+                  }
+                }
               }
             }
 
-            if (rulesetId) {
-              await github.request("DELETE /repos/{owner}/{repo}/rulesets/{ruleset_id}", {
-                owner,
-                repo,
-                ruleset_id: Number(rulesetId),
-              });
-              core.info(`deleted ruleset ${rulesetId}`);
+            const summary = {
+              tag_name: tagName,
+              target_repository: `${owner}/${repo}`,
+              action_repository: process.env.ACTION_REPOSITORY,
+              action_ref: process.env.ACTION_REF,
+              exercise_result: process.env.EXERCISE_RESULT,
+              release_step_outcome: process.env.RELEASE_OUTCOME || "missing",
+              expected_diagnostic_matched: process.env.DIAGNOSTIC_MATCHED === "true",
+              diagnostic_annotation_count: Number(process.env.ANNOTATION_COUNT || 0),
+              diagnostic_check_run_id: process.env.CHECK_RUN_ID || null,
+              deleted_release_id: diagnosticReleaseId ?? null,
+              action_release_id_output: actionReleaseId ?? null,
+              direct_release_lookup_status: directReleaseLookupStatus,
+              release_list_observations: releaseListObservations,
+              matching_release_count: matchingReleases.length,
+              matching_release_ids: matchingReleases.map((release) => release.id),
+              consecutive_empty_release_reads: consecutiveEmptyReads,
+              tag_lookup_status: tagLookupStatus,
+              ruleset_id: rulesetId ?? null,
+              verification_errors: verificationErrors,
+              cleanup: {
+                release_ids: [...releaseIds].sort((left, right) => left - right),
+                operations: cleanupOperations,
+                post_cleanup_release_statuses: postCleanupReleaseStatuses,
+                post_cleanup_tag_status: postCleanupTagStatus,
+                post_cleanup_ruleset_status: postCleanupRulesetStatus,
+                errors: cleanupErrors,
+              },
+            };
+
+            core.info(`verification_summary=${JSON.stringify(summary)}`);
+            await core.summary
+              .addHeading("Blocked tag verification summary")
+              .addCodeBlock(JSON.stringify(summary, null, 2), "json")
+              .write();
+
+            const errors = [...verificationErrors, ...cleanupErrors];
+            if (errors.length > 0) {
+              core.setFailed(errors.join("; "));
             }
