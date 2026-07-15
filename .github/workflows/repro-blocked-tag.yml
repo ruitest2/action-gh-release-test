@@ -1,5 +1,5 @@
 name: repro-blocked-tag
-run-name: repro-blocked-tag-${{ inputs.action_ref }}
+run-name: repro-blocked-tag-${{ inputs.control_mode }}-${{ inputs.action_ref }}
 
 on:
   workflow_dispatch:
@@ -12,6 +12,14 @@ on:
         description: Action ref to test
         required: true
         default: v3.0.2
+      control_mode:
+        description: Blocked-tag scenario or unrelated action-failure control
+        required: true
+        type: choice
+        options:
+          - blocked-tag
+          - invalid-action-token
+        default: blocked-tag
       release_repository:
         description: Repository to publish the release into
         required: true
@@ -26,22 +34,33 @@ jobs:
   exercise:
     runs-on: ubuntu-latest
     outputs:
+      action_checkout_outcome: ${{ steps.result.outputs.action_checkout_outcome }}
+      asset_outcome: ${{ steps.result.outputs.asset_outcome }}
+      exercise_run_attempt: ${{ steps.result.outputs.exercise_run_attempt }}
+      harness_checkout_outcome: ${{ steps.result.outputs.harness_checkout_outcome }}
       release_id: ${{ steps.result.outputs.release_id }}
       release_outcome: ${{ steps.result.outputs.release_outcome }}
       ruleset_id: ${{ steps.result.outputs.ruleset_id }}
+      ruleset_outcome: ${{ steps.result.outputs.ruleset_outcome }}
+      tag_name: ${{ steps.result.outputs.tag_name }}
     env:
       TAG_NAME: v722.${{ github.run_id }}.${{ github.run_attempt }}
       RELEASE_REPOSITORY: ${{ inputs.release_repository }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout harness
+        id: checkout-harness
+        uses: actions/checkout@v6
 
-      - uses: actions/checkout@v6
+      - name: Checkout action under test
+        id: checkout-action
+        uses: actions/checkout@v6
         with:
           repository: ${{ inputs.action_repository }}
           ref: ${{ inputs.action_ref }}
           path: action-under-test
 
       - name: Prepare asset
+        id: asset
         run: |
           printf 'blocked tag repro for %s\n' "${TAG_NAME}" > blocked-tag.txt
 
@@ -78,7 +97,10 @@ jobs:
           tag_name: ${{ env.TAG_NAME }}
           name: Blocked tag repro ${{ env.TAG_NAME }}
           repository: ${{ inputs.release_repository }}
-          token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
+          token: >-
+            ${{ inputs.control_mode == 'invalid-action-token'
+                && 'invalid-token-for-action-gh-release-negative-control'
+                || secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
           files: blocked-tag.txt
 
       - name: Capture exercise state
@@ -86,14 +108,26 @@ jobs:
         if: always()
         shell: bash
         env:
+          ACTION_CHECKOUT_OUTCOME: ${{ steps.checkout-action.outcome }}
+          ASSET_OUTCOME: ${{ steps.asset.outcome }}
+          EXERCISE_RUN_ATTEMPT: ${{ github.run_attempt }}
+          HARNESS_CHECKOUT_OUTCOME: ${{ steps.checkout-harness.outcome }}
           RELEASE_ID: ${{ steps.release.outputs.id }}
           RELEASE_OUTCOME: ${{ steps.release.outcome }}
           RULESET_ID: ${{ steps.ruleset.outputs.ruleset_id }}
+          RULESET_OUTCOME: ${{ steps.ruleset.outcome }}
+          TAG_NAME: ${{ env.TAG_NAME }}
         run: |
           {
+            printf 'action_checkout_outcome=%s\n' "${ACTION_CHECKOUT_OUTCOME:-skipped}"
+            printf 'asset_outcome=%s\n' "${ASSET_OUTCOME:-skipped}"
+            printf 'exercise_run_attempt=%s\n' "${EXERCISE_RUN_ATTEMPT}"
+            printf 'harness_checkout_outcome=%s\n' "${HARNESS_CHECKOUT_OUTCOME:-skipped}"
             printf 'release_id=%s\n' "${RELEASE_ID:-}"
             printf 'release_outcome=%s\n' "${RELEASE_OUTCOME:-skipped}"
             printf 'ruleset_id=%s\n' "${RULESET_ID:-}"
+            printf 'ruleset_outcome=%s\n' "${RULESET_OUTCOME:-skipped}"
+            printf 'tag_name=%s\n' "${TAG_NAME}"
           } >> "$GITHUB_OUTPUT"
 
   verify-and-cleanup:
@@ -101,8 +135,10 @@ jobs:
     needs: exercise
     runs-on: ubuntu-latest
     env:
-      TAG_NAME: v722.${{ github.run_id }}.${{ github.run_attempt }}
+      CONTROL_MODE: ${{ inputs.control_mode }}
+      EXERCISE_RUN_ATTEMPT: ${{ needs.exercise.outputs.exercise_run_attempt || github.run_attempt }}
       RELEASE_REPOSITORY: ${{ inputs.release_repository }}
+      TAG_NAME: ${{ needs.exercise.outputs.tag_name || format('v722.{0}.{1}', github.run_id, github.run_attempt) }}
     steps:
       - name: Find blocked-tag diagnostic
         id: diagnostic
@@ -111,37 +147,68 @@ jobs:
           github-token: ${{ github.token }}
           script: |
             const { owner, repo } = context.repo;
+            const controlMode = process.env.CONTROL_MODE;
+            const exerciseRunAttempt = Number(process.env.EXERCISE_RUN_ATTEMPT);
             const tagName = process.env.TAG_NAME;
             const escapedTag = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
             const diagnosticPattern = new RegExp(
               `^Tag creation for ${escapedTag} is blocked by repository rules\\. ` +
                 `Deleted draft release (\\d+) to avoid leaving an orphaned draft release\\.$`,
             );
+            const authenticationPatterns = [
+              ["bad-credentials", /bad credentials/i],
+              ["requires-authentication", /requires authentication/i],
+              ["resource-not-accessible", /resource not accessible/i],
+              ["unauthorized", /unauthorized/i],
+            ];
 
             let annotationCount = 0;
+            let actionExecuted = false;
+            let actionStepApiConclusion = "";
+            let authenticationEvidence = [];
             let checkRunId = "";
             let deletedReleaseId = "";
             let diagnosticMatched = false;
             let diagnosticError = "";
+            let errorAnnotationCount = 0;
 
             try {
+              if (!["blocked-tag", "invalid-action-token"].includes(controlMode)) {
+                throw new Error(`unsupported control mode: ${controlMode || "missing"}`);
+              }
+              if (!Number.isInteger(exerciseRunAttempt) || exerciseRunAttempt < 1) {
+                throw new Error(
+                  `exercise run attempt is not a positive integer: ${process.env.EXERCISE_RUN_ATTEMPT}`,
+                );
+              }
+
               const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
                 owner,
                 repo,
                 run_id: context.runId,
-                filter: "latest",
+                filter: "all",
                 per_page: 100,
               });
-              const exerciseJobs = jobs.filter((job) => job.name === "exercise");
+              const exerciseJobs = jobs.filter(
+                (job) => job.name === "exercise" && job.run_attempt === exerciseRunAttempt,
+              );
               if (exerciseJobs.length !== 1) {
-                throw new Error(`expected one completed exercise job, found ${exerciseJobs.length}`);
+                throw new Error(
+                  `expected one exercise job for run attempt ${exerciseRunAttempt}, found ${exerciseJobs.length}`,
+                );
               }
 
-              const checkRunMatch = exerciseJobs[0].check_run_url?.match(/\/check-runs\/(\d+)$/);
+              const exerciseJob = exerciseJobs[0];
+              const checkRunMatch = exerciseJob.check_run_url?.match(/\/check-runs\/(\d+)$/);
               if (!checkRunMatch) {
                 throw new Error("exercise job did not expose a check-run ID");
               }
               checkRunId = checkRunMatch[1];
+              const actionStep = exerciseJob.steps?.find(
+                (step) => step.name === "Attempt release with blocked tag creation",
+              );
+              actionExecuted = actionStep?.status === "completed";
+              actionStepApiConclusion = actionStep?.conclusion || "missing";
 
               for (let attempt = 1; attempt <= 8; attempt += 1) {
                 const annotations = await github.paginate(github.rest.checks.listAnnotations, {
@@ -150,63 +217,91 @@ jobs:
                   check_run_id: Number(checkRunId),
                   per_page: 100,
                 });
+                const errorAnnotations = annotations.filter(
+                  (annotation) => annotation.annotation_level === "failure",
+                );
                 const matches = annotations
-                  .map((annotation) => ({
-                    annotation,
-                    match:
-                      typeof annotation.message === "string"
-                        ? annotation.message.match(diagnosticPattern)
-                        : null,
-                  }))
-                  .filter(({ match }) => match !== null);
+                  .map((annotation) =>
+                    typeof annotation.message === "string"
+                      ? annotation.message.match(diagnosticPattern)
+                      : null,
+                  )
+                  .filter((match) => match !== null);
                 annotationCount = matches.length;
+                errorAnnotationCount = errorAnnotations.length;
+                authenticationEvidence = [
+                  ...new Set(
+                    errorAnnotations.flatMap((annotation) => {
+                      if (typeof annotation.message !== "string") return [];
+                      return authenticationPatterns
+                        .filter(([, pattern]) => pattern.test(annotation.message))
+                        .map(([label]) => label);
+                    }),
+                  ),
+                ];
 
                 if (matches.length > 1) {
                   throw new Error(`expected one blocked-tag diagnostic, found ${matches.length}`);
                 }
                 if (matches.length === 1) {
-                  deletedReleaseId = matches[0].match[1];
+                  deletedReleaseId = matches[0][1];
                   diagnosticMatched = true;
+                }
+                if (
+                  (controlMode === "blocked-tag" && diagnosticMatched) ||
+                  (controlMode === "invalid-action-token" && errorAnnotationCount > 0)
+                ) {
                   break;
                 }
                 if (attempt < 8) {
                   await new Promise((resolve) => setTimeout(resolve, 1000));
                 }
               }
-
-              if (!diagnosticMatched) {
-                throw new Error("expected blocked-tag diagnostic was not found");
-              }
             } catch (error) {
               diagnosticError = error instanceof Error ? error.message : String(error);
-              core.setFailed(diagnosticError);
             }
 
             core.setOutput("annotation_count", String(annotationCount));
+            core.setOutput("action_executed", String(actionExecuted));
+            core.setOutput("action_step_api_conclusion", actionStepApiConclusion);
+            core.setOutput("authentication_evidence", JSON.stringify(authenticationEvidence));
             core.setOutput("check_run_id", checkRunId);
             core.setOutput("deleted_release_id", deletedReleaseId);
             core.setOutput("diagnostic_error", diagnosticError);
             core.setOutput("diagnostic_matched", String(diagnosticMatched));
+            core.setOutput("error_annotation_count", String(errorAnnotationCount));
 
       - name: Verify blocked-tag state and clean up
         if: always()
         uses: actions/github-script@v8
         env:
+          ACTION_CHECKOUT_OUTCOME: ${{ needs.exercise.outputs.action_checkout_outcome }}
+          ACTION_EXECUTED: ${{ steps.diagnostic.outputs.action_executed }}
           ACTION_REF: ${{ inputs.action_ref }}
           ACTION_REPOSITORY: ${{ inputs.action_repository }}
           ACTION_RELEASE_ID: ${{ needs.exercise.outputs.release_id }}
+          ACTION_STEP_API_CONCLUSION: ${{ steps.diagnostic.outputs.action_step_api_conclusion }}
           ANNOTATION_COUNT: ${{ steps.diagnostic.outputs.annotation_count }}
+          ASSET_OUTCOME: ${{ needs.exercise.outputs.asset_outcome }}
+          AUTHENTICATION_EVIDENCE: ${{ steps.diagnostic.outputs.authentication_evidence }}
           CHECK_RUN_ID: ${{ steps.diagnostic.outputs.check_run_id }}
           DELETED_RELEASE_ID: ${{ steps.diagnostic.outputs.deleted_release_id }}
           DIAGNOSTIC_ERROR: ${{ steps.diagnostic.outputs.diagnostic_error }}
           DIAGNOSTIC_MATCHED: ${{ steps.diagnostic.outputs.diagnostic_matched }}
+          ERROR_ANNOTATION_COUNT: ${{ steps.diagnostic.outputs.error_annotation_count }}
+          EXERCISE_RUN_ATTEMPT: ${{ needs.exercise.outputs.exercise_run_attempt }}
           EXERCISE_RESULT: ${{ needs.exercise.result }}
+          HARNESS_CHECKOUT_OUTCOME: ${{ needs.exercise.outputs.harness_checkout_outcome }}
           RELEASE_OUTCOME: ${{ needs.exercise.outputs.release_outcome }}
           RULESET_ID: ${{ needs.exercise.outputs.ruleset_id }}
+          RULESET_OUTCOME: ${{ needs.exercise.outputs.ruleset_outcome }}
         with:
           github-token: ${{ secrets.ACTION_GH_RELEASE_TRIGGER_TOKEN }}
           script: |
             const [owner, repo] = process.env.RELEASE_REPOSITORY.split("/");
+            const controlMode = process.env.CONTROL_MODE;
+            const isBlockedTagScenario = controlMode === "blocked-tag";
+            const isInvalidTokenControl = controlMode === "invalid-action-token";
             const tagName = process.env.TAG_NAME;
             const statusOf = (error) =>
               typeof error?.status === "number"
@@ -217,6 +312,16 @@ jobs:
             const messageOf = (error) =>
               error instanceof Error ? error.message : String(error);
             const numericId = (value) => (/^\d+$/.test(value || "") ? Number(value) : undefined);
+            const parseStringArray = (value) => {
+              try {
+                const parsed = JSON.parse(value || "[]");
+                return Array.isArray(parsed)
+                  ? parsed.filter((item) => typeof item === "string")
+                  : [];
+              } catch {
+                return [];
+              }
+            };
 
             const verificationErrors = [];
             const cleanupErrors = [];
@@ -224,6 +329,9 @@ jobs:
             const releaseIds = new Set();
             const diagnosticReleaseId = numericId(process.env.DELETED_RELEASE_ID);
             const actionReleaseId = numericId(process.env.ACTION_RELEASE_ID);
+            const authenticationEvidence = parseStringArray(
+              process.env.AUTHENTICATION_EVIDENCE,
+            );
             const rulesetId = numericId(process.env.RULESET_ID);
             if (diagnosticReleaseId !== undefined) releaseIds.add(diagnosticReleaseId);
             if (actionReleaseId !== undefined) releaseIds.add(actionReleaseId);
@@ -238,29 +346,94 @@ jobs:
             const postCleanupReleaseStatuses = {};
 
             try {
+              if (!isBlockedTagScenario && !isInvalidTokenControl) {
+                verificationErrors.push(`unsupported control mode: ${controlMode || "missing"}`);
+              }
               if (process.env.EXERCISE_RESULT !== "success") {
                 verificationErrors.push(
                   `exercise job did not complete successfully: ${process.env.EXERCISE_RESULT}`,
                 );
+              }
+              if (process.env.HARNESS_CHECKOUT_OUTCOME !== "success") {
+                verificationErrors.push(
+                  `harness checkout did not succeed: ${process.env.HARNESS_CHECKOUT_OUTCOME || "missing"}`,
+                );
+              }
+              if (process.env.ACTION_CHECKOUT_OUTCOME !== "success") {
+                verificationErrors.push(
+                  `action checkout did not succeed: ${process.env.ACTION_CHECKOUT_OUTCOME || "missing"}`,
+                );
+              }
+              if (process.env.ASSET_OUTCOME !== "success") {
+                verificationErrors.push(
+                  `asset preparation did not succeed: ${process.env.ASSET_OUTCOME || "missing"}`,
+                );
+              }
+              if (process.env.RULESET_OUTCOME !== "success") {
+                verificationErrors.push(
+                  `ruleset creation did not succeed: ${process.env.RULESET_OUTCOME || "missing"}`,
+                );
+              }
+              if (process.env.ACTION_EXECUTED !== "true") {
+                verificationErrors.push("action release step did not execute to completion");
               }
               if (process.env.RELEASE_OUTCOME !== "failure") {
                 verificationErrors.push(
                   `expected release outcome failure, got ${process.env.RELEASE_OUTCOME || "missing"}`,
                 );
               }
-              if (process.env.DIAGNOSTIC_MATCHED !== "true") {
-                verificationErrors.push(
-                  `expected blocked-tag diagnostic did not match: ${process.env.DIAGNOSTIC_ERROR || "no diagnostic"}`,
-                );
-              }
-              if (diagnosticReleaseId === undefined) {
-                verificationErrors.push("blocked-tag diagnostic did not provide a numeric release ID");
-              }
               if (rulesetId === undefined) {
                 verificationErrors.push("exercise job did not provide a numeric ruleset ID");
               }
+              if (process.env.DIAGNOSTIC_ERROR) {
+                verificationErrors.push(
+                  `exercise annotation inspection failed: ${process.env.DIAGNOSTIC_ERROR}`,
+                );
+              }
 
-              if (diagnosticReleaseId !== undefined) {
+              if (isBlockedTagScenario) {
+                if (Number(process.env.ANNOTATION_COUNT || 0) !== 1) {
+                  verificationErrors.push(
+                    `expected one blocked-tag diagnostic, found ${process.env.ANNOTATION_COUNT || 0}`,
+                  );
+                }
+                if (process.env.DIAGNOSTIC_MATCHED !== "true") {
+                  verificationErrors.push("expected blocked-tag diagnostic did not match");
+                }
+                if (diagnosticReleaseId === undefined) {
+                  verificationErrors.push(
+                    "blocked-tag diagnostic did not provide a numeric release ID",
+                  );
+                }
+              }
+
+              if (isInvalidTokenControl) {
+                if (Number(process.env.ANNOTATION_COUNT || 0) !== 0) {
+                  verificationErrors.push(
+                    `invalid-token control unexpectedly found ${process.env.ANNOTATION_COUNT} blocked-tag diagnostics`,
+                  );
+                }
+                if (process.env.DIAGNOSTIC_MATCHED === "true") {
+                  verificationErrors.push(
+                    "invalid-token control unexpectedly matched the blocked-tag diagnostic",
+                  );
+                }
+                if (diagnosticReleaseId !== undefined) {
+                  verificationErrors.push(
+                    `invalid-token control unexpectedly accepted diagnostic release ID ${diagnosticReleaseId}`,
+                  );
+                }
+                if (authenticationEvidence.length === 0) {
+                  verificationErrors.push(
+                    "invalid-token control did not expose authentication-failure annotation evidence",
+                  );
+                }
+                verificationErrors.push(
+                  "invalid-action-token control intentionally fails because the exact blocked-tag cleanup diagnostic was absent",
+                );
+              }
+
+              if (isBlockedTagScenario && diagnosticReleaseId !== undefined) {
                 try {
                   await github.rest.repos.getRelease({
                     owner,
@@ -462,15 +635,26 @@ jobs:
             }
 
             const summary = {
+              control_mode: controlMode,
               tag_name: tagName,
               target_repository: `${owner}/${repo}`,
               action_repository: process.env.ACTION_REPOSITORY,
               action_ref: process.env.ACTION_REF,
               exercise_result: process.env.EXERCISE_RESULT,
+              exercise_run_attempt: Number(process.env.EXERCISE_RUN_ATTEMPT || 0) || null,
+              exercise_check_run_id: process.env.CHECK_RUN_ID || null,
+              harness_checkout_outcome: process.env.HARNESS_CHECKOUT_OUTCOME || "missing",
+              action_checkout_outcome: process.env.ACTION_CHECKOUT_OUTCOME || "missing",
+              asset_preparation_outcome: process.env.ASSET_OUTCOME || "missing",
+              ruleset_creation_outcome: process.env.RULESET_OUTCOME || "missing",
+              action_step_executed: process.env.ACTION_EXECUTED === "true",
               release_step_outcome: process.env.RELEASE_OUTCOME || "missing",
+              action_step_api_conclusion:
+                process.env.ACTION_STEP_API_CONCLUSION || "missing",
+              error_annotation_count: Number(process.env.ERROR_ANNOTATION_COUNT || 0),
+              authentication_failure_evidence: authenticationEvidence,
               expected_diagnostic_matched: process.env.DIAGNOSTIC_MATCHED === "true",
               diagnostic_annotation_count: Number(process.env.ANNOTATION_COUNT || 0),
-              diagnostic_check_run_id: process.env.CHECK_RUN_ID || null,
               deleted_release_id: diagnosticReleaseId ?? null,
               action_release_id_output: actionReleaseId ?? null,
               direct_release_lookup_status: directReleaseLookupStatus,
