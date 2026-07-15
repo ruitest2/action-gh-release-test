@@ -41,7 +41,7 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
   The workflow accepts `asset_name` and `expected_display_name`, so reuse it for both plain filenames and GitHub-renamed assets such as `.config`.
 - Use `.github/workflows/repro-windows.yml` for Windows-runner regressions (`#729`); treat it as an attempted reproduction unless the workflow actually fails with the reported credential error.
 - Use `.github/workflows/repro-blocked-tag.yml` for blocked-tag finalization and orphan-draft cleanup behavior (`#722`).
-  Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow creates and removes a temporary tag ruleset in the target repository, asserts that the action fails, and asserts that no orphan release remains.
+  Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow defaults to this harness repository, creates and removes a temporary tag ruleset, asserts that the action fails, and asserts that no orphan release remains.
 - Use `.github/workflows/repro-preserve-order.yml` only to confirm docs/usage behavior for `preserve_order` (`#645`).
   Do not keep `#645` in the active bug-fix bucket unless the workflow shows an action-level ordering defect rather than GitHub's own release-asset ordering.
 - Use `.github/workflows/repro-append-body.yml` for existing-release update and `append_body` behavior (`#613`, `#216`, `#238`).

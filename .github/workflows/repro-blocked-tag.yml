@@ -15,7 +15,7 @@ on:
       release_repository:
         description: Repository to publish the release into
         required: true
-        default: chenrui333/action-gh-release
+        default: ruitest2/action-gh-release-test
 
 permissions:
   contents: read
