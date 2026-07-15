@@ -1,0 +1,21 @@
+.github/workflows/repro-blocked-tag.yml
+  s_e2383fc11696b7::t_b67db4082dbb68 18
+AGENTS.md
+  s_e2383fc11696b7::t_b67db4082dbb68 44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e6c84e3fe13051539a964c9deeb0fae6434ecb1b",
+  "prompts": {},
+  "sessions": {
+    "s_e2383fc11696b7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6578-27a9-7582-940e-a14389e9ed7a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
