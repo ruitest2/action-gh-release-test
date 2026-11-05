@@ -15,7 +15,7 @@ on:
       expected_dotfile_name:
         description: Expected displayed name for .config
         required: true
-        default: default.config
+        default: .config
 
 permissions:
   contents: write

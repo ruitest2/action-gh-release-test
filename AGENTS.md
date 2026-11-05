@@ -28,9 +28,12 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Keep the default `e2e.yml` for simple smoke testing of release creation and asset upload on released upstream `v3.0.2`.
   Use tag pushes for the default released-baseline path and `workflow_dispatch` when you need an exact upstream ref without editing the workflow.
 - Use `.github/workflows/repro-make-latest.yml` for the `make_latest: false` regression and fix verification (`#703`, PR `#715`).
+  Its default `expected_latest: previous` is the fixed behavior; pass `current` only to reproduce the old bug. Run it with no other release-creating workflow in flight, because any concurrent release can become the repo-wide latest during the assertion.
+- Expectation inputs default to current fixed behavior so a no-override run on the released baseline passes: `repro-release-discussion.yml` defaults to `present`, `trigger-prerelease.yml` to both observers `present`, and `repro-dotfile.yml` to displayed name `.config`.
 - Use `.github/workflows/repro-assets-output.yml` for invalid `assets` output URLs and fix verification (`#713`, `#222`, PR `#738`).
   It is the primary Linux verifier for the release outputs contract: `assets`, `url`, `id`, and `upload_url`. Keep the workflow default on `expected_url_kind: tagged` unless you are intentionally reproducing the old broken behavior.
 - Use `.github/workflows/repro-race.yml` for concurrent same-tag creation races (`#705`) and related duplicate-release checks such as `#140`, `#146`, `#215`, and `#375`.
+  It only fails when no release exists for the tag. Losing workers can still leave empty orphan drafts when their own new draft is not yet visible in `listReleases`; count drafts per tag when comparing refs (see `docs/action-gh-release-3.0.4-journal.md`).
 - Use `.github/workflows/repro-finalize-race.yml` for the draft-finalization retry path (`#704`, `#709`).
   Re-run both against released upstream `v3.0.2` or the exact upstream ref under test before opening a race-fix PR so the journal reflects which race still reproduces after the latest merged fixes.
 - Use `.github/workflows/trigger-prerelease.yml` together with `.github/workflows/observe-prereleased.yml` and `.github/workflows/observe-published.yml` for prerelease event behavior (`#708`).
@@ -59,7 +62,7 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Use `.github/workflows/repro-remote-repo.yml` for remote-repository release creation and asset upload (`#639`, `#308`, upstream issue `#786`).
   Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first. The workflow targets the dedicated private, discussions-disabled `ruitest2/action-gh-release-target-no-discussions` repository, distinguishes omitted, empty, and invalid discussion categories plus valid and inaccessible tokens, supports Windows and Ubuntu runners, and cleans up every matching release and tag after inspection.
 - Use `.github/workflows/repro-token-precedence.yml` for remote-repository token precedence (`#639`).
-  Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow intentionally sets `GITHUB_TOKEN` and expects the explicit `token` input to win, then cleans up both the test release and the matching remote tag.
+  Configure `ACTION_GH_RELEASE_TRIGGER_TOKEN` first; the workflow intentionally sets `GITHUB_TOKEN` and expects the explicit `token` input to win, then cleans up both the test release and the matching remote tag. Its default target is the same dedicated `ruitest2/action-gh-release-target-no-discussions` repository used by `repro-remote-repo.yml`.
 - Use `.github/workflows/repro-existing-draft.yml` for existing-draft reuse and draft-state behavior (`#163`, PR `#245`).
   Pass `draft_mode: keep` to verify the release stays draft, or `draft_mode: publish` to verify the seeded draft is reused and then published when `draft` is omitted.
 - Use `.github/workflows/repro-draft-false.yml` for `draft: false` behavior when creating prereleases outside a tag-triggered job (`#253`, `#379`), for the four existing-draft prerelease transitions in upstream issue `#795` (omitted, null-expression, explicit false, and explicit true), and for moving-tag updates in upstream issue `#772`.
@@ -70,10 +73,12 @@ Treat it as a minimal consumer repo that verifies release creation and asset upl
 - Use `.github/workflows/repro-body-too-long.yml` for large body handling and env-size stress around release notes (`#374`, `#471`).
 - Use `.github/workflows/repro-many-files.yml` for large asset-count behavior (`#335`).
 - Use `.github/workflows/repro-paren-asset.yml` for parentheses filename handling on Windows (`#393`).
-- Use `.github/workflows/repro-target-commitish.yml` for non-latest `target_commitish` release creation (`#411`), and make sure it targets a recent commit that did not modify `.github/workflows/`.
+- Use `.github/workflows/repro-target-commitish.yml` for non-latest `target_commitish` release creation (`#411`).
+  `GITHUB_TOKEN` cannot create a tag on a commit whose `.github/workflows/` tree differs from `HEAD`, so the workflow targets the newest older commit that shares `HEAD`'s workflow tree and falls back to `HEAD` (with a notice) when a workflow change is the latest commit.
 - Use `.github/workflows/repro-dm-asset.yml` for DexMetadata-style `.dm` asset uploads (`#434`).
 - Use `.github/workflows/repro-previous-tag-release-notes.yml` for the `previous_tag` / explicit-release-notes-range feature work around PR `#372`.
   This harness seeds two prior releases and only passes if the action-generated release body matches GitHub's `generateReleaseNotes` output for the explicitly requested older `previous_tag`, not the most recent release.
+  It uses the same workflow-tree constraint as `repro-target-commitish.yml`; when fewer than three recent commits share `HEAD`'s workflow tree, the seeded tags reuse a commit and the tag-specific compare links keep the expected bodies distinct.
 - Use `.github/workflows/repro-empty-token.yml` only to confirm docs/usage behavior for empty-string token handling (`#541`).
   Do not keep `#541` in the active bug-fix bucket unless the workflow shows a distinct runtime defect beyond the documented `token: ""` semantics.
 - Use `.github/workflows/repro-unicode-asset.yml` only to confirm docs/usage behavior for Unicode and special-character asset naming (`#542`, likely related to `#393`).
