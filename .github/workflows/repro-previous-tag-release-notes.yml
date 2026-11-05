@@ -39,10 +39,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # GITHUB_TOKEN cannot create a tag on a commit whose .github/workflows
+          # tree differs from HEAD, so only those commits are usable targets.
+          head_tree="$(git rev-parse HEAD:.github/workflows)"
           shas=()
           while read -r sha; do
-            files="$(git show --pretty=format: --name-only "$sha")"
-            if [ -n "$files" ] && ! grep -q '^\.github/workflows/' <<<"$files"; then
+            if [ "$(git rev-parse "$sha:.github/workflows" 2>/dev/null || true)" = "$head_tree" ]; then
               shas+=("$sha")
             fi
             if [ "${#shas[@]}" -ge 3 ]; then
@@ -50,15 +52,19 @@ jobs:
             fi
           done < <(git rev-list --max-count=80 HEAD)
 
+          # Tags may share a commit; the generated compare links still keep the
+          # expected bodies distinct, which the expected-bodies step enforces.
           if [ "${#shas[@]}" -lt 3 ]; then
-            echo "failed to find three recent non-workflow commits" >&2
-            exit 1
+            echo "::notice::only ${#shas[@]} recent commit(s) share HEAD's workflow tree; reusing the oldest for the remaining tags"
           fi
+          current_sha="${shas[0]}"
+          latest_sha="${shas[1]:-$current_sha}"
+          previous_sha="${shas[2]:-$latest_sha}"
 
           {
-            echo "current_sha=${shas[0]}"
-            echo "latest_sha=${shas[1]}"
-            echo "previous_sha=${shas[2]}"
+            echo "current_sha=$current_sha"
+            echo "latest_sha=$latest_sha"
+            echo "previous_sha=$previous_sha"
           } >> "$GITHUB_OUTPUT"
 
       - name: Prepare asset
