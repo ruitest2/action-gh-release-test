@@ -1,0 +1,24 @@
+.github/workflows/repro-dotfile.yml
+  h_9df9c32c3f321d 18
+.github/workflows/repro-make-latest.yml
+  h_9df9c32c3f321d 22
+.github/workflows/repro-release-discussion.yml
+  h_9df9c32c3f321d 23
+.github/workflows/trigger-prerelease.yml
+  h_9df9c32c3f321d 23
+AGENTS.md
+  h_9df9c32c3f321d 31-32,36,65,76-77,81
+docs/action-gh-release-3.0.4-journal.md
+  h_9df9c32c3f321d 1-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d723b3b4ba73e6103c9abf7f9e82cce9de6c57d7",
+  "prompts": {},
+  "humans": {
+    "h_9df9c32c3f321d": {
+      "author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
