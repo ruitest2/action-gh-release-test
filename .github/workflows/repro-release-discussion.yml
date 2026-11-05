@@ -20,7 +20,7 @@ on:
         options:
           - present
           - absent
-        default: absent
+        default: present
 
 permissions:
   contents: write

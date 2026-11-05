@@ -19,7 +19,7 @@ on:
         options:
           - previous
           - current
-        default: current
+        default: previous
 
 concurrency:
   cancel-in-progress: false

@@ -32,23 +32,26 @@ jobs:
           ref: ${{ inputs.action_ref }}
           path: action-under-test
 
-      - name: Resolve previous non-workflow commit
+      - name: Resolve previous commit with the current workflow tree
         id: previous
         shell: bash
         run: |
           set -euo pipefail
-          target_sha=""
+          # GITHUB_TOKEN cannot create a tag on a commit whose .github/workflows
+          # tree differs from HEAD, so only those commits are usable targets.
+          head_tree="$(git rev-parse HEAD:.github/workflows)"
+          eligible=()
           while read -r sha; do
-            files="$(git show --pretty=format: --name-only "$sha")"
-            if [ -n "$files" ] && ! grep -q '^\.github/workflows/' <<<"$files"; then
-              target_sha="$sha"
-              break
+            if [ "$(git rev-parse "$sha:.github/workflows" 2>/dev/null || true)" = "$head_tree" ]; then
+              eligible+=("$sha")
             fi
           done < <(git rev-list --max-count=50 HEAD)
 
-          if [ -z "$target_sha" ]; then
-            echo "failed to find a non-workflow commit in recent history" >&2
-            exit 1
+          if [ "${#eligible[@]}" -ge 2 ]; then
+            target_sha="${eligible[1]}"
+          else
+            target_sha="${eligible[0]}"
+            echo "::notice::no older commit shares HEAD's workflow tree; targeting HEAD $target_sha"
           fi
 
           echo "sha=$target_sha" >> "$GITHUB_OUTPUT"

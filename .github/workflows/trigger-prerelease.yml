@@ -20,7 +20,7 @@ on:
           - absent
           - ignore
           - present
-        default: absent
+        default: present
       expected_published:
         description: Whether the published observer should fire
         required: true
